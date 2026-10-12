@@ -4,10 +4,12 @@ import { useCallback, useMemo, useState } from 'react';
 import type { LedgerEntry } from '../../core/ledger';
 import type { SealedMessage } from '../../core/protocol';
 import type { SessionSnapshot } from '../../core/world';
+import type { FloorPointer } from '../../server/floor';
 import JournalGrid from './JournalGrid';
 import Tape from './Tape';
 import type { Envelope } from './envelope';
 import { cash, clockOf, shortKey } from './format';
+import { pointerSearch } from './pointer';
 
 /**
  * The audit room.
@@ -32,16 +34,19 @@ interface Room {
   readonly maxTicks: number;
   readonly trades: number;
   readonly closed: boolean;
+  readonly pointer: FloorPointer;
 }
 
 export default function AuditRoom({
   id,
   initial,
   rooms,
+  pointer,
 }: {
   id: string;
   initial: Envelope;
   rooms: readonly Room[];
+  pointer: FloorPointer;
 }): React.ReactElement {
   const [snapshot, setSnapshot] = useState<SessionSnapshot>(initial.snapshot);
   const [upto, setUpto] = useState<number | null>(null);
@@ -54,8 +59,12 @@ export default function AuditRoom({
   const visibleEntries = useMemo(() => snapshot.entries.filter((entry) => entry.seq <= shown), [snapshot.entries, shown]);
   const findings = snapshot.verification.findings;
 
+  // Every read and every link from here carries the pointer, so a room another machine opened - or one
+  // this machine has forgotten - is still reachable from the audit screen.
+  const asked = useMemo(() => pointerSearch(pointer, snapshot.tick), [pointer, snapshot.tick]);
+
   const reread = useCallback(async () => {
-    const response = await fetch(`/api/floor/${encodeURIComponent(id)}`, { cache: 'no-store' });
+    const response = await fetch(`/api/floor/${encodeURIComponent(id)}?${asked}`, { cache: 'no-store' });
     const body = (await response.json()) as Partial<Envelope> & { error?: string };
     if (body.snapshot === undefined) {
       setNotice(body.error ?? 'the room would not answer');
@@ -63,7 +72,7 @@ export default function AuditRoom({
     }
     setSnapshot(body.snapshot);
     setNotice(`${String(body.snapshot.messages.length)} sealed lines read`);
-  }, [id]);
+  }, [asked, id]);
 
   const balances = useMemo(() => {
     const totals = new Map<string, { debit: number; credit: number }>();
@@ -109,13 +118,13 @@ export default function AuditRoom({
         </dl>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <a
-            href={`/floor/${encodeURIComponent(id)}`}
+            href={`/floor/${encodeURIComponent(id)}?${asked}`}
             className="rounded border border-white/20 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-white/70 no-underline hover:border-brass hover:text-brass"
           >
             back to the pit
           </a>
           <a
-            href={`/api/floor/${encodeURIComponent(id)}/tape`}
+            href={`/api/floor/${encodeURIComponent(id)}/tape?${asked}`}
             download={`${id}.tape.json`}
             className="rounded border border-white/20 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-white/70 no-underline hover:border-brass hover:text-brass"
           >
@@ -138,7 +147,7 @@ export default function AuditRoom({
           {rooms.map((room) => (
             <a
               key={room.id}
-              href={`/audit?floor=${encodeURIComponent(room.id)}`}
+              href={`/audit?floor=${encodeURIComponent(room.id)}&${pointerSearch(room.pointer, room.tick)}`}
               className={`rounded-full border px-3 py-1 font-mono text-[11px] no-underline transition ${
                 room.id === id ? 'border-brass bg-brass/18 text-brass' : 'border-white/15 text-white/55 hover:border-white/35'
               }`}

@@ -184,15 +184,15 @@ export default function DocsPage(): React.ReactElement {
         </li>
         <li className="flex flex-wrap gap-x-3">
           <span className="w-[190px] shrink-0 text-buy">GET /api/floor/&#123;id&#125;</span>
-          <span className="text-white/55">the whole room; <span className="text-white/70">?since=&lt;seq&gt;</span> trims only the tape</span>
+          <span className="text-white/55">the whole room; <span className="text-white/70">?since=&lt;seq&gt;</span> trims only the tape, and a pointer in the query — <span className="text-white/70">?seed=…&amp;instruments=…&amp;ticks=…&amp;round=…</span> — replays the room on a machine that never saw it</span>
         </li>
         <li className="flex flex-wrap gap-x-3">
           <span className="w-[190px] shrink-0 text-buy">POST /api/floor/&#123;id&#125;</span>
-          <span className="text-white/55">one round, run to the bell, close, and the human actions on a settlement — once <span className="text-white/70">OPERATOR_TOKEN</span> is set, the ones that speak for the platform need it in an <span className="text-white/70">x-operator-token</span> header</span>
+          <span className="text-white/55">one round, run to the bell, close, and the human actions on a settlement — the same pointer in the body rebuilds the room first, and once <span className="text-white/70">OPERATOR_TOKEN</span> is set the ones that speak for the platform need it in an <span className="text-white/70">x-operator-token</span> header</span>
         </li>
         <li className="flex flex-wrap gap-x-3">
           <span className="w-[190px] shrink-0 text-buy">GET /api/floor/&#123;id&#125;/tape</span>
-          <span className="text-white/55">the whole recording as a file, in the format the auditor reads</span>
+          <span className="text-white/55">the whole recording as a file, in the format the auditor reads — pointer in the query included, so a tape can be taken from any machine</span>
         </li>
         <li className="flex flex-wrap gap-x-3">
           <span className="w-[190px] shrink-0 text-sell">POST /api/webhooks/paypal</span>

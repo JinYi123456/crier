@@ -1,5 +1,6 @@
 import { INSTRUMENTS } from '../core/catalog';
 import { listFloors } from '../server/floor';
+import { floorHref } from './ui/pointer';
 import OpenFloorForm from './ui/OpenFloorForm';
 
 export const dynamic = 'force-dynamic';
@@ -53,7 +54,7 @@ export default function Home(): React.ReactElement {
             {floors.map((floor) => (
               <li key={floor.id}>
                 <a
-                  href={`/floor/${floor.id}`}
+                  href={floorHref(floor.id, floor.pointer, floor.tick)}
                   className="brass-edge block rounded bg-felt/60 p-4 no-underline transition hover:bg-felt-2"
                 >
                   <div className="flex items-baseline justify-between gap-3">

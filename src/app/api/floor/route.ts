@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server';
-import { CATALOG_AS_OF, INSTRUMENTS, instrumentById } from '../../../core/catalog';
-import { FloorError, listFloors, openFloor, suggestedSeed, type OpenFloorRequest } from '../../../server/floor';
+import { CATALOG_AS_OF, INSTRUMENTS } from '../../../core/catalog';
+import {
+  FloorError,
+  listFloors,
+  openFloor,
+  openRequestOf,
+  pointerFrom,
+  pointerOf,
+  roundOf,
+  runToTick,
+} from '../../../server/floor';
 
 /**
  * Opening and listing floors.
@@ -9,6 +18,10 @@ import { FloorError, listFloors, openFloor, suggestedSeed, type OpenFloorRequest
  * the answer is a room anybody holding the id can inspect and audit for themselves. The seed is the
  * only required field; leave it out and the floor opens on a fresh one, so a first-time visitor sees
  * a market rather than a form.
+ *
+ * The answer carries the pointer back - the seed and the shape the id was hashed from - because that
+ * is what lets a screen hand the same room to a different machine later, or put it in a URL for
+ * somebody else to open.
  */
 
 export const runtime = 'nodejs';
@@ -31,38 +44,21 @@ export async function GET(): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  let body: Partial<OpenFloorRequest> = {};
+  let body: Record<string, unknown> = {};
   try {
-    body = (await request.json()) as Partial<OpenFloorRequest>;
+    body = (await request.json()) as Record<string, unknown>;
   } catch {
     body = {};
   }
-  const instruments = Array.isArray(body.instruments) ? body.instruments.map((id) => String(id).trim()).filter(Boolean) : [];
-  const unknown = instruments.filter((id) => {
-    try {
-      instrumentById(id);
-      return false;
-    } catch {
-      return true;
-    }
-  });
-  if (unknown.length > 0) {
-    return NextResponse.json({ error: `the catalogue has no instrument called ${unknown.join(', ')}` }, { status: 422 });
-  }
-
-  const seed = typeof body.seed === 'string' ? body.seed.trim() : '';
-  const openRequest: OpenFloorRequest = {
-    seed: seed.length > 0 ? seed : suggestedSeed(),
-    instruments,
-    gateway: body.gateway === 'sandbox' ? 'sandbox' : 'sim',
-    payoutMode: body.payoutMode === 'batched' ? 'batched' : 'immediate',
-    ...(Number.isSafeInteger(body.agentsPerSide) ? { agentsPerSide: body.agentsPerSide } : {}),
-    ...(Number.isSafeInteger(body.maxTicks) ? { maxTicks: body.maxTicks } : {}),
-  };
 
   try {
-    const room = await openFloor(openRequest);
-    return NextResponse.json({ floor: room.session.session, snapshot: room.session.snapshot() });
+    const pointer = pointerFrom(body);
+    const room = await openFloor(openRequestOf(pointer));
+    const id = room.session.session;
+    // A round the caller names is how a screen on a fresh machine catches up to a floor that was
+    // opened on another one: the replay is exact, so the room it lands in is the room it left.
+    await runToTick(id, roundOf(body));
+    return NextResponse.json({ floor: id, pointer: pointerOf(room), snapshot: room.session.snapshot() });
   } catch (error) {
     if (error instanceof FloorError) return NextResponse.json({ error: error.message }, { status: error.status });
     const message = error instanceof Error ? error.message : String(error);

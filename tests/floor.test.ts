@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   FloorError,
   actOnFloorTrade,
+  clampShape,
   closeFloor,
   deliverEvent,
   floorSnapshot,
+  forgetFloors,
   openFloor,
+  readPointer,
   runFloor,
   stepFloor,
   suggestedSeed,
@@ -13,11 +16,14 @@ import {
   webhookGateway,
 } from '../src/server/floor';
 import type { GatewayEvent } from '../src/gateway/types';
+import type { FloorPointer } from '../src/server/floor';
 import type { SessionSnapshot } from '../src/core/world';
+import { pointerParams } from '../src/app/ui/pointer';
 import { computeSealHash, keyringFrom, verifyChain } from '../src/core/protocol';
 import { identityFromPublicKeyHex } from '../src/core/keys';
 import { GET } from '../src/app/api/floor/[id]/tape/route';
-import { POST } from '../src/app/api/floor/[id]/route';
+import { GET as readFloor, POST } from '../src/app/api/floor/[id]/route';
+import { POST as openFloorViaHttp } from '../src/app/api/floor/route';
 
 /**
  * The floor as a service.
@@ -265,5 +271,150 @@ describe('the settlement desk', () => {
     const { id } = await floor('open-desk', { instruments: ['coffee-green'], maxTicks: 3 });
     expect(floorSnapshot(id).locked).toBe(false);
     expect((await post(id, { action: 'close' })).status).toBe(200);
+  });
+});
+
+/**
+ * A room on a machine that never saw it.
+ *
+ * A deployment with no database has to answer this question, and the answer is the seed: the rounds
+ * are a pure function of it and of the shape the id was hashed from, so a caller that quotes both can
+ * be served by any machine, and the tape it gets is the same tape, line for line and seal for seal.
+ */
+describe('a floor that comes back from its pointer', () => {
+  const shape = 'seed=rebuild-here&instruments=coffee-green&agents=4&ticks=4';
+
+  function read(id: string, query: string): Promise<Response> {
+    return readFloor(new Request(`http://localhost/api/floor/${id}?${query}`), { params: Promise.resolve({ id }) });
+  }
+
+  function send(id: string, body: Record<string, unknown>): Promise<Response> {
+    return POST(
+      new Request(`http://localhost/api/floor/${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+      { params: Promise.resolve({ id }) },
+    );
+  }
+
+  it('reads a pointer out of either a body or a URL, and refuses a catalogue with no such pit', () => {
+    const fromUrl = readPointer(
+      Object.fromEntries(new URLSearchParams('seed=brave-mill&instruments=coffee-green,saffron&agents=3&ticks=9&gateway=sandbox&payout=batched')),
+    );
+    expect(fromUrl).toEqual({
+      seed: 'brave-mill',
+      instruments: ['coffee-green', 'saffron'],
+      agentsPerSide: 3,
+      maxTicks: 9,
+      gateway: 'sandbox',
+      payoutMode: 'batched',
+    });
+    expect(readPointer({ seed: 'brave-mill', instruments: ['ceramic-mug'] })).toMatchObject({
+      instruments: ['ceramic-mug'],
+      agentsPerSide: 4,
+      maxTicks: 12,
+      gateway: 'sim',
+    });
+    expect(readPointer({})).toBeNull();
+    expect(() => readPointer({ seed: 'brave-mill', instruments: 'sunset-boulevard' })).toThrow(FloorError);
+    // The dials are small on purpose: a hand-typed URL must not be able to ask for a million rounds.
+    expect(clampShape(99, 100_000)).toEqual({ agentsPerSide: 8, maxTicks: 60 });
+    expect(clampShape(0, -4)).toEqual({ agentsPerSide: 1, maxTicks: 1 });
+  });
+
+  it('takes either spelling of a pointer for the same room', async () => {
+    const ask = async (fields: Record<string, unknown>) => {
+      const response = await openFloorViaHttp(
+        new Request('http://localhost/api/floor', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(fields) }),
+      );
+      return (await response.json()) as { floor?: string; pointer?: FloorPointer; error?: string };
+    };
+    const short = await ask({ seed: 'two-dialects', instruments: 'coffee-green', agents: 3, ticks: 7, payout: 'batched' });
+    expect(short.pointer).toEqual({
+      seed: 'two-dialects',
+      instruments: ['coffee-green'],
+      agentsPerSide: 3,
+      maxTicks: 7,
+      gateway: 'sim',
+      payoutMode: 'batched',
+    });
+    forgetFloors();
+    const long = await ask({ seed: 'two-dialects', instruments: ['coffee-green'], agentsPerSide: 3, maxTicks: 7, payoutMode: 'batched' });
+    // The short names belong in a URL, the long ones are what the engine calls them - either way the
+    // room they hash to is the same room, and a shape quietly dropped to a default would not be.
+    expect(long.floor).toBe(short.floor);
+    const roundTrip = short.pointer === undefined ? null : readPointer(pointerParams(short.pointer));
+    expect(roundTrip).toEqual(short.pointer);
+    const bogus = await ask({ seed: 'two-dialects', instruments: 'sunset-boulevard' });
+    expect(bogus.error).toContain('no instrument called');
+  });
+
+  it('brings a forgotten room back at the round its caller is standing at', async () => {
+    const { id } = await floor('rebuild-here', { instruments: ['coffee-green'], maxTicks: 4 });
+    await stepFloor(id);
+    await stepFloor(id);
+    const third = await stepFloor(id);
+    expect(third.tick).toBe(3);
+    const atThree = floorSnapshot(id, -1);
+    const fourth = await stepFloor(id);
+    const atFour = floorSnapshot(id, -1);
+
+    forgetFloors();
+    expect(() => floorSnapshot(id)).toThrow(FloorError);
+    // A round nobody named means the opening, and this floor had three of them by then.
+    expect((await read(id, `${shape}&since=-1`)).status).toBe(200);
+
+    forgetFloors();
+    const back = await read(id, `${shape}&round=1&since=-1`);
+    expect(back.status).toBe(200);
+    const one = (await back.json()) as { snapshot: SessionSnapshot; rebuilt?: boolean };
+    expect(one.snapshot.tick).toBe(1);
+    // The answer says it had to rebuild, so a caller is not left assuming the desk came with the room.
+    expect(one.rebuilt).toBe(true);
+    const again = await read(id, `${shape}&round=1&since=-1`);
+    expect(((await again.json()) as { rebuilt?: boolean }).rebuilt).toBe(false);
+
+    // Ringing the bell on the rebuilt room carries on the same recording the unbroken one was on.
+    forgetFloors();
+    const stepped = await send(id, { action: 'step', seed: 'rebuild-here', instruments: 'coffee-green', agents: 4, ticks: 4, round: 2 });
+    expect(stepped.status).toBe(200);
+    expect(((await stepped.json()) as { result: { tick: number } }).result.tick).toBe(3);
+
+    const now = await read(id, `${shape}&round=3&since=-1`);
+    const body = (await now.json()) as { snapshot: SessionSnapshot };
+    expect(JSON.stringify(body.snapshot.messages)).toBe(JSON.stringify(atThree.snapshot.messages));
+    expect(body.snapshot.entries).toEqual(atThree.snapshot.entries);
+
+    const ended = (await (await read(id, `${shape}&round=9&since=-1`)).json()) as { snapshot: SessionSnapshot };
+    expect(ended.snapshot.tick).toBe(fourth.tick);
+    expect(ended.snapshot.headHash).toBe(atFour.snapshot.headHash);
+    const keyring = keyringFrom(ended.snapshot.messages.map((message) => identityFromPublicKeyHex(message.actor, message.key)));
+    expect(verifyChain(ended.snapshot.messages, keyring).ok).toBe(true);
+  });
+
+  it('will not let one pointer open another room, and hands the tape anyway', async () => {
+    const { id } = await floor('tape-after-amnesia', { instruments: ['coffee-green'], maxTicks: 3 });
+    // Three rounds named out loud, not runFloor: that one stops early on a round that says nothing,
+    // and the tape has to be compared against a room standing at a round both sides can count.
+    await stepFloor(id);
+    await stepFloor(id);
+    await stepFloor(id);
+    const head = floorSnapshot(id).snapshot.headHash;
+    forgetFloors();
+
+    const wrong = await read('crier_not_this_room', 'seed=tape-after-amnesia&instruments=coffee-green&ticks=3&round=3');
+    expect(wrong.status).toBe(404);
+    expect(((await wrong.json()) as { error: string }).error).toContain('does not name this room');
+
+    const empty = await GET(new Request('http://localhost/api/floor/crier_x/tape?seed=not-a-seed-here'), { params: Promise.resolve({ id: 'crier_x' }) });
+    expect(empty.status).toBe(404);
+
+    const held = await GET(new Request(`http://localhost/api/floor/${id}/tape?seed=tape-after-amnesia&instruments=coffee-green&ticks=3&round=3`), {
+      params: Promise.resolve({ id }),
+    });
+    expect(held.status).toBe(200);
+    expect(((await held.json()) as SessionSnapshot).headHash).toBe(head);
   });
 });

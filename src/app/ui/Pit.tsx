@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SessionSnapshot, SerializedTrade } from '../../core/world';
 import type { Finding, SealedMessage } from '../../core/protocol';
-import type { TickResult } from '../../server/floor';
+import type { FloorPointer, TickResult } from '../../server/floor';
 import type { TradeActionKind } from './ChitStack';
 import ChitStack from './ChitStack';
 import DepthBoard from './DepthBoard';
@@ -12,6 +12,7 @@ import Tape from './Tape';
 import TradeRail from './TradeRail';
 import { cash, shortKey } from './format';
 import { readOperatorKey, rememberOperatorKey } from './operator';
+import { pointerParams } from './pointer';
 import { floorSound, thump } from './sound';
 import type { InstrumentCard } from './instruments';
 import type { Envelope } from './envelope';
@@ -28,10 +29,14 @@ export default function Pit({
   id,
   initial,
   instruments,
+  pointer,
+  rebuilt,
 }: {
   id: string;
   initial: Envelope;
   instruments: readonly InstrumentCard[];
+  pointer?: FloorPointer;
+  rebuilt?: boolean;
 }): React.ReactElement {
   const [snapshot, setSnapshot] = useState<SessionSnapshot>(initial.snapshot);
   const [messages, setMessages] = useState<readonly SealedMessage[]>(initial.snapshot.messages);
@@ -51,6 +56,16 @@ export default function Pit({
   const operatorKeyRef = useRef('');
   const seqRef = useRef(initial.sinceSeq);
   const printsRef = useRef(initial.snapshot.trades.length);
+  const roundRef = useRef(initial.snapshot.tick);
+
+  /**
+   * The room's own address, in the form every request can carry.
+   *
+   * A floor lives in the memory of the machine that opened it, so a screen that keeps quoting the
+   * seed and the shape can be answered by any machine - the one that has the room, or one that has to
+   * rebuild it from the seed and run it to the round this screen is standing at.
+   */
+  const pointerFields = useMemo<Record<string, string> | null>(() => (pointer === undefined ? null : pointerParams(pointer)), [pointer]);
 
   const trades = snapshot.trades;
   const held = useMemo(() => trades.filter((trade) => trade.held), [trades]);
@@ -70,9 +85,26 @@ export default function Pit({
     setDeskLocked(initial.locked === true && stored.length === 0);
   }, [initial.locked]);
 
+  // Say out loud when this machine had to rebuild the room: the rounds replay exactly, but a decision
+  // somebody signed at the desk after them is not in the seed, so it did not come.
+  useEffect(() => {
+    if (rebuilt !== true) return;
+    setNotice({ text: 'this machine rebuilt the room from its pointer - the rounds replay seal for seal, but what was signed at the desk after them stays where it was signed', bad: false });
+  }, [rebuilt]);
+
+  // The pointer and the round this screen is standing at, as a query string any request can carry.
+  const search = useCallback(
+    (extra?: Record<string, string>): string | null => {
+      if (pointerFields === null) return null;
+      return new URLSearchParams({ ...pointerFields, round: String(roundRef.current), ...extra }).toString();
+    },
+    [pointerFields],
+  );
+
   const pull = useCallback(
     async (since: number): Promise<void> => {
-      const response = await fetch(`/api/floor/${encodeURIComponent(id)}?since=${since}`, { cache: 'no-store' });
+      const asked = search({ since: String(since) });
+      const response = await fetch(`/api/floor/${encodeURIComponent(id)}?${asked ?? `since=${since}`}`, { cache: 'no-store' });
       const body = (await response.json()) as Partial<Envelope> & { error?: string };
       if (body.snapshot === undefined || body.sinceSeq === undefined) {
         setNotice({ text: body.error ?? 'the floor would not answer', bad: true });
@@ -94,13 +126,19 @@ export default function Pit({
       const printed = body.snapshot.trades.length > printsRef.current;
       printsRef.current = body.snapshot.trades.length;
       seqRef.current = body.sinceSeq;
+      roundRef.current = body.snapshot.tick;
       setSnapshot(body.snapshot);
+      // The address bar carries the pointer too, so reloading or sending this URL to somebody else
+      // lands them on this floor at this round, on whichever machine answers.
+      const carried = search();
+      const where = carried === null ? null : `/floor/${encodeURIComponent(id)}?${carried}`;
+      if (where !== null && where !== window.location.pathname + window.location.search) window.history.replaceState(null, '', where);
       if (printed) {
         setPrintFlash((count) => count + 1);
         shout('print');
       }
     },
-    [id, shout],
+    [id, search, shout],
   );
 
   const post = useCallback(
@@ -109,7 +147,7 @@ export default function Pit({
       const response = await fetch(`/api/floor/${encodeURIComponent(id)}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', ...(held.length > 0 ? { 'x-operator-token': held } : {}) },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...pointerFields, round: roundRef.current, ...payload }),
       });
       const body = (await response.json()) as Record<string, unknown>;
       if (response.status === 401) {
@@ -121,7 +159,7 @@ export default function Pit({
       const error = typeof body.error === 'string' ? body.error : response.ok ? '' : 'the floor refused';
       return { ok: response.ok && error === '', body, error };
     },
-    [id],
+    [id, pointerFields],
   );
 
   const handOverKey = useCallback((): void => {

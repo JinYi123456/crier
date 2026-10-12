@@ -1,5 +1,5 @@
 import { INSTRUMENTS } from '../../../core/catalog';
-import { FloorError, floorSnapshot } from '../../../server/floor';
+import { FloorError, floorSnapshot, pointerOf, readPointer, roomForId, roundOf } from '../../../server/floor';
 import Pit from '../../ui/Pit';
 
 export const dynamic = 'force-dynamic';
@@ -10,9 +10,20 @@ export const dynamic = 'force-dynamic';
  * The page reads the floor the same way the API does, so what you see when the URL is opened is the
  * tape as it stands at that moment - and after that the screen keeps itself current by asking only
  * for the lines it has not seen.
+ *
+ * A URL that carries the room's pointer - `?seed=…&instruments=…&ticks=…&round=…` - can also be
+ * painted by a machine that never opened this floor: it rebuilds the room from the seed and runs it to
+ * the round the URL names, which is the same room because the same rounds are a deterministic thing.
  */
-export default async function FloorPage({ params }: { params: Promise<{ id: string }> }): Promise<React.ReactElement> {
+export default async function FloorPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<React.ReactElement> {
   const { id } = await params;
+  const query = await searchParams;
   const room = decodeURIComponent(id);
   const instruments = INSTRUMENTS.map((instrument) => ({
     id: instrument.id,
@@ -25,8 +36,9 @@ export default async function FloorPage({ params }: { params: Promise<{ id: stri
   }));
 
   try {
+    const { room: held, rebuilt } = await roomForId(room, readPointer(query), roundOf(query));
     const initial = floorSnapshot(room);
-    return <Pit id={room} initial={initial} instruments={instruments} />;
+    return <Pit id={room} initial={initial} instruments={instruments} pointer={pointerOf(held)} rebuilt={rebuilt} />;
   } catch (error) {
     if (!(error instanceof FloorError)) throw error;
     return (

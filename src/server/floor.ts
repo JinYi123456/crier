@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { DEFAULT_INSTRUMENTS, Session, type SessionConfig } from '../core/world';
+import { instrumentById } from '../core/catalog';
 import type { CurrencyCode } from '../core/money';
 import { verifyChain, type Finding } from '../core/protocol';
 import { PayPalGateway } from '../gateway/paypal';
@@ -134,6 +135,147 @@ export async function openFloor(request: OpenFloorRequest, env: Readonly<Record<
   return room;
 }
 
+/**
+ * What it takes to bring a room back on a machine that has never seen it: the seed, and the four
+ * fields the room's id is hashed from. This is not a credential - the seed is written in the tape in
+ * plain text - it is the room's address.
+ */
+export interface FloorPointer {
+  readonly seed: string;
+  readonly instruments: readonly string[];
+  readonly agentsPerSide: number;
+  readonly maxTicks: number;
+  readonly gateway: 'sim' | 'sandbox';
+  readonly payoutMode: 'immediate' | 'batched';
+}
+
+/** The shape a floor takes when the caller does not say. */
+const DEFAULT_SHAPE = { agentsPerSide: 4, maxTicks: 12 } as const;
+
+function wholeField(value: unknown, fallback: number): number {
+  const given = Array.isArray(value) ? value[0] : value;
+  const parsed = typeof given === 'number' ? given : Number.parseInt(typeof given === 'string' ? given : '', 10);
+  return Number.isSafeInteger(parsed) ? parsed : fallback;
+}
+
+/** The dials are small on purpose: a caller with a hand-typed URL must not be able to ask for a million rounds. */
+export function clampShape(agentsPerSide: number, maxTicks: number): { agentsPerSide: number; maxTicks: number } {
+  return {
+    agentsPerSide: Math.min(8, Math.max(1, agentsPerSide)),
+    maxTicks: Math.min(60, Math.max(1, maxTicks)),
+  };
+}
+
+/**
+ * A pointer, spelled either way.
+ *
+ * The short names (`agents`, `ticks`, `payout`) belong in a URL, where a hand-typed address has to fit
+ * in a message; the long ones (`agentsPerSide`, `maxTicks`, `payoutMode`) are the names the engine
+ * itself uses, so a pointer read out of a JSON answer can be posted straight back. Both are accepted
+ * everywhere - one address, two dialects - and a shape named in either is never quietly dropped to a
+ * default, which would hash the caller into a different room.
+ */
+function numberField(source: Readonly<Record<string, unknown>>, shortName: string, longName: string, fallback: number): number {
+  const shortValue = wholeField(source[shortName], Number.NaN);
+  const longValue = wholeField(source[longName], Number.NaN);
+  if (Number.isSafeInteger(shortValue)) return shortValue;
+  return Number.isSafeInteger(longValue) ? longValue : fallback;
+}
+
+/**
+ * Read a pointer out of a request body or a query string, or say that the caller named no room.
+ *
+ * Instruments arrive either as a JSON list or as a comma-separated run of ids, because the same
+ * fields are used by a browser posting a decision and by a URL somebody pasted into a message.
+ */
+export function readPointer(source: Readonly<Record<string, unknown>>): FloorPointer | null {
+  const named = typeof source['seed'] === 'string' ? source['seed'].trim() : '';
+  if (named.length === 0) return null;
+  const instruments = listedInstruments(source['instruments']);
+  return {
+    seed: named,
+    instruments,
+    ...clampShape(
+      numberField(source, 'agents', 'agentsPerSide', DEFAULT_SHAPE.agentsPerSide),
+      numberField(source, 'ticks', 'maxTicks', DEFAULT_SHAPE.maxTicks),
+    ),
+    gateway: gatewayOf(source),
+    payoutMode: payoutOf(source),
+  };
+}
+
+/** The same reading with no veto on a missing seed: a floor being opened from a form may name none. */
+export function pointerFrom(source: Readonly<Record<string, unknown>>): FloorPointer {
+  const named = typeof source['seed'] === 'string' ? source['seed'].trim() : '';
+  const read = readPointer({ ...source, seed: named.length > 0 ? named : suggestedSeed() });
+  if (read === null) throw new FloorError('a floor needs a seed to be remembered by');
+  return read;
+}
+
+/** The opening request a pointer describes. */
+export function openRequestOf(pointer: FloorPointer): OpenFloorRequest {
+  return {
+    seed: pointer.seed,
+    instruments: pointer.instruments,
+    gateway: pointer.gateway,
+    payoutMode: pointer.payoutMode,
+    agentsPerSide: pointer.agentsPerSide,
+    maxTicks: pointer.maxTicks,
+  };
+}
+
+function listedInstruments(listed: unknown): string[] {
+  const instruments = Array.isArray(listed)
+    ? listed.map((entry) => String(entry).trim()).filter(Boolean)
+    : typeof listed === 'string'
+      ? listed.split(',').map((entry) => entry.trim()).filter(Boolean)
+      : [];
+  const unknown = instruments.filter((id) => !catalogueHas(id));
+  if (unknown.length > 0) throw new FloorError(`the catalogue has no instrument called ${unknown.join(', ')}`, 422);
+  return instruments.length > 0 ? instruments : [...DEFAULT_INSTRUMENTS];
+}
+
+function gatewayOf(source: Readonly<Record<string, unknown>>): 'sim' | 'sandbox' {
+  return one(source['gateway']) === 'sandbox' ? 'sandbox' : 'sim';
+}
+
+function payoutOf(source: Readonly<Record<string, unknown>>): 'immediate' | 'batched' {
+  return one(source['payout']) === 'batched' || one(source['payoutMode']) === 'batched' ? 'batched' : 'immediate';
+}
+
+/** A repeated query parameter arrives as a list; the first one is the one the address meant. */
+function one(value: unknown): unknown {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+/** The round the caller is standing at. Absent or nonsense means the opening, which is round nought. */
+export function roundOf(source: Readonly<Record<string, unknown>>): number {
+  const parsed = wholeField(source['round'], 0);
+  return Math.max(0, parsed);
+}
+
+function catalogueHas(id: string): boolean {
+  try {
+    instrumentById(id);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The pointer a room answers to, taken from the room itself rather than from what somebody typed. */
+export function pointerOf(room: Room): FloorPointer {
+  const config = room.session.config;
+  return {
+    seed: config.seed,
+    instruments: config.instrumentIds ?? [...DEFAULT_INSTRUMENTS],
+    agentsPerSide: config.agentsPerSide,
+    maxTicks: config.maxTicks,
+    gateway: room.session.gateway.mode,
+    payoutMode: config.payoutMode ?? 'immediate',
+  };
+}
+
 export interface RoomSummary {
   readonly id: string;
   readonly seed: string;
@@ -147,6 +289,8 @@ export interface RoomSummary {
   readonly held: number;
   readonly messages: number;
   readonly headHash: string;
+  /** Carried so a list of rooms can hand out links that any other machine is able to answer. */
+  readonly pointer: FloorPointer;
 }
 
 function summaryOf(room: Room): RoomSummary {
@@ -164,11 +308,23 @@ function summaryOf(room: Room): RoomSummary {
     held: session.heldTrades.length,
     messages: session.chain.messages.length,
     headHash: session.chain.headHash,
+    pointer: pointerOf(room),
   };
 }
 
 export function listFloors(): RoomSummary[] {
   return [...store().rooms.values()].map(summaryOf).sort((a, b) => b.openedAt - a.openedAt);
+}
+
+/**
+ * Take every room out of this machine's memory, which is what a restart does to a floor.
+ *
+ * The tape is the record, so nothing is lost that was meant to be kept - and a test can ask the one
+ * question a deployment without a database has to answer: can a room that was never opened here be
+ * brought back from what its caller is holding?
+ */
+export function forgetFloors(): void {
+  store().rooms.clear();
 }
 
 /**
@@ -226,6 +382,57 @@ export async function runFloor(id: string, maxRounds = 24): Promise<TickResult[]
     if (result.silent) break;
   }
   return rounds;
+}
+
+/**
+ * Ring the bell until the room stands at the round its caller is looking at.
+ *
+ * Rounds are a pure function of the seed and the shape: the session keeps its own clock and the local
+ * processor answers to that clock, so replaying seven rounds on a machine that never heard of this
+ * floor gives back the same seven rounds - the same words, the same prints, the same seals.
+ */
+export async function runToTick(id: string, round: number): Promise<number> {
+  const room = mustFind(id);
+  const wanted = Number.isSafeInteger(round) ? Math.trunc(round) : 0;
+  const target = Math.min(Math.max(0, wanted), room.session.config.maxTicks);
+  while (room.session.tick < target && !room.session.closed) await stepFloor(id);
+  return room.session.tick;
+}
+
+/**
+ * The room a request means.
+ *
+ * Usually it is the one already in this process's memory. When it is not - because the machine
+ * restarted, or because the request landed on one that never saw the floor - and the caller brought a
+ * pointer, the room is rebuilt from its seed and run forward to the round the caller is holding. A
+ * room this machine already knows is run forward too when it turns out to be behind, which is the
+ * same bell anybody may ring.
+ * Rebuild is a recording rather than a desk: replay cannot bring back a decision somebody signed
+ * after the rounds, so a rebuilt room has not seen those.
+ */
+export interface HeldRoom {
+  readonly room: Room;
+  /** True when this machine had to rebuild the room from the pointer instead of answering from memory. */
+  readonly rebuilt: boolean;
+}
+
+export async function roomForId(
+  id: string,
+  pointer: FloorPointer | null,
+  round = 0,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): Promise<HeldRoom> {
+  const known = store().rooms.get(id);
+  if (known !== undefined) {
+    known.lastSeen = Date.now();
+    await runToTick(id, round);
+    return { room: known, rebuilt: false };
+  }
+  if (pointer === null) throw new FloorError(`no floor is running under ${id}`, 404);
+  const opened = await openFloor(pointer, env);
+  if (opened.session.session !== id) throw new FloorError('that pointer does not name this room', 404);
+  await runToTick(id, round);
+  return { room: opened, rebuilt: true };
 }
 
 export async function closeFloor(id: string): Promise<RoomSummary> {

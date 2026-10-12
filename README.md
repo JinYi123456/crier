@@ -153,9 +153,13 @@ be skipped by forgetting it.
 
 ## What this is not
 
-- **Not durable.** Rooms live in the process that opened them. A restart closes the floor. The
-  recording is a single JSON document — **take the tape** in the audit room, or `--json` from the
-  terminal — so a session is kept by writing it out, not by pointing this at a database.
+- **Not durable.** Rooms live in the process that opened them, and a restart forgets which floors were
+  running. What it does not lose is the recording: every round is a pure function of the seed and the
+  shape the id was hashed from, so a URL that carries that pointer — `?seed=…&instruments=…&ticks=…`
+  — is answered by any machine, warmed or brand new, and the tape it paints is the same tape, line for
+  line and seal for seal. That is a replay, not a desk: a decision somebody signed at the desk after
+  the rounds is not in the seed, so a rebuilt room has not seen it. Take the tape in the audit room,
+  or `--json` from the terminal, for the whole session as one signed document.
 - **Not an operator console.** The human pile is one floor's pile, and there are no roles and no
   audit trail on the operator's own login. Set `OPERATOR_TOKEN` and the desk stops moving money for
   a caller who cannot quote the key — a release, a veto, a refund, a payout, an early bell and the

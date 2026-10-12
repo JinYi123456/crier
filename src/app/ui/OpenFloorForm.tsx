@@ -2,6 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import type { FloorPointer } from '../../server/floor';
+import { floorHref } from './pointer';
 
 /**
  * The doors of the exchange.
@@ -48,13 +50,15 @@ export default function OpenFloorForm({ instruments }: { instruments: readonly I
           maxTicks: ticks,
         }),
       });
-      const body = (await response.json()) as { floor?: string; error?: string };
+      const body = (await response.json()) as { floor?: string; error?: string; pointer?: FloorPointer };
       if (!response.ok || typeof body.floor !== 'string') {
         setError(body.error ?? 'the floor would not open');
         setBusy(false);
         return;
       }
-      router.push(`/floor/${body.floor}`);
+      // The pointer goes in the URL, so the room this seed opened can be rebuilt by whichever machine
+      // answers next - a reload, a link sent to a friend, or a serverless platform with no memory.
+      router.push(body.pointer === undefined ? `/floor/${encodeURIComponent(body.floor)}` : floorHref(body.floor, body.pointer, 0));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
       setBusy(false);

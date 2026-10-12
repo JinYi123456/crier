@@ -1,5 +1,16 @@
 import { NextResponse } from 'next/server';
-import { actOnFloorTrade, closeFloor, floorSnapshot, runFloor, stepFloor, tamperFloor, type TradeAction } from '../../../../server/floor';
+import {
+  actOnFloorTrade,
+  closeFloor,
+  floorSnapshot,
+  readPointer,
+  roundOf,
+  roomForId,
+  runFloor,
+  stepFloor,
+  tamperFloor,
+  type TradeAction,
+} from '../../../../server/floor';
 import { jsonError, readBody, stringField } from '../../../../server/http';
 import { deskIsLocked, operatorRefusal } from '../../../../server/operator';
 
@@ -10,6 +21,11 @@ import { deskIsLocked, operatorRefusal } from '../../../../server/operator';
  * polls without re-fetching a thousand seals every second. The rest of the snapshot - board, seats,
  * trades, accounts, entries - is always complete, because a screen that shows a slice of the books
  * is a screen that can be quietly wrong.
+ *
+ * A request can also bring the floor's pointer - its seed, its pits, its shape - and a machine that
+ * has never seen this room rebuilds it from those and runs it to the round the caller names. That is
+ * what a room with no database is: a floor lives where it was opened, and it comes back anywhere else
+ * out of the seed it was opened with.
  */
 
 export const runtime = 'nodejs';
@@ -18,10 +34,15 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
   try {
     const { id } = await context.params;
-    const since = new URL(request.url).searchParams.get('since');
-    const parsed = since === null ? -1 : Number.parseInt(since, 10);
-    const { snapshot, sinceSeq } = floorSnapshot(decodeURIComponent(id), Number.isSafeInteger(parsed) ? parsed : -1);
-    return NextResponse.json({ snapshot, sinceSeq, locked: deskIsLocked() });
+    const room = decodeURIComponent(id);
+    const query = Object.fromEntries(new URL(request.url).searchParams);
+    const { rebuilt } = await roomForId(room, readPointer(query), roundOf(query));
+    const since = query['since'];
+    const parsed = typeof since === 'string' ? Number.parseInt(since, 10) : -1;
+    const { snapshot, sinceSeq } = floorSnapshot(room, Number.isSafeInteger(parsed) ? parsed : -1);
+    // `rebuilt` says this machine had to replay the room from its pointer, so what it is holding is the
+    // rounds and not anything a person signed at the desk after them.
+    return NextResponse.json({ snapshot, sinceSeq, locked: deskIsLocked(), rebuilt });
   } catch (error) {
     return jsonError(error);
   }
@@ -33,7 +54,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
  * One round, the floor to the bell, the bell itself, the human actions on a trade, and a
  * demonstration that edits the tape on purpose. There is no action here that moves money without
  * either a match on the board or a signed decision behind it - and once an operator key is set, the
- * actions that speak for the platform refuse a caller that cannot quote it.
+ * actions that speak for the platform refuse a caller that cannot quote it. A body carrying a
+ * pointer rebuilds a room this machine has forgotten before the action runs against it.
  */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
   const { id } = await context.params;
@@ -43,6 +65,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const refusal = operatorRefusal(request, action);
   if (refusal !== null) return refusal;
   try {
+    await roomForId(room, readPointer(body), roundOf(body));
     switch (action) {
       case 'step':
         return NextResponse.json({ result: await stepFloor(room) });
