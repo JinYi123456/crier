@@ -1,0 +1,164 @@
+@import "tailwindcss";
+
+/*
+ * The look of the floor: dark felt, brass fittings, cream ledger paper.
+ *
+ * Everything here is in service of one metaphor - a room you are standing over, not a dashboard of
+ * cards. Colour always means the same thing: green is a buyer, red is a seller, brass is a human
+ * decision, and cream is a number that has been written down and will not change.
+ */
+
+@theme {
+  --color-ink: #07080a;
+  --color-felt: #0e1216;
+  --color-felt-2: #141a20;
+  --color-timber: #2a1d12;
+  --color-brass: #d9a441;
+  --color-brass-dim: #8a6519;
+  --color-paper: #f1e7d4;
+  --color-paper-2: #d8ccb4;
+  --color-buy: #3fbf9a;
+  --color-sell: #e2683f;
+  --color-flag: #c9a227;
+  --color-alarm: #d44a3e;
+
+  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --font-mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-sans: "Helvetica Neue", Arial, "Segoe UI", system-ui, sans-serif;
+}
+
+html {
+  background: var(--color-ink);
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(1200px 620px at 50% -12%, #1b2430 0%, transparent 70%),
+    linear-gradient(180deg, #0b0f13 0%, #07080a 55%);
+  min-height: 100vh;
+  color: #e8e3d8;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The felt ring the pit sits in. */
+.pit-floor {
+  background:
+    repeating-linear-gradient(94deg, rgba(255, 255, 255, 0.022) 0 2px, transparent 2px 7px),
+    radial-gradient(60% 52% at 50% 44%, #1d2731 0%, #12181e 62%, #0a0e12 100%);
+  box-shadow:
+    inset 0 0 120px rgba(0, 0, 0, 0.75),
+    0 30px 90px rgba(0, 0, 0, 0.6);
+}
+
+.paper {
+  background: linear-gradient(180deg, #f4ecdc 0%, #e4d8bf 100%);
+  color: #26201a;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+}
+
+.brass-edge {
+  border: 1px solid rgba(217, 164, 65, 0.34);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+/* A shout travelling from a seat to the clerk's board. */
+@keyframes shout-ripple {
+  0% {
+    transform: scale(0.35);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+.ripple {
+  animation: shout-ripple 900ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+
+/* A print lands, the board jumps. */
+@keyframes print-knock {
+  0% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(-3px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.knock {
+  animation: print-knock 320ms ease-out;
+}
+
+/* The bell rope swinging while the floor is live. */
+@keyframes bell-swing {
+  0%,
+  100% {
+    transform: rotate(-7deg);
+  }
+  50% {
+    transform: rotate(7deg);
+  }
+}
+
+.bell-live {
+  animation: bell-swing 1.6s ease-in-out infinite;
+  transform-origin: 50% 6%;
+}
+
+/* Tape sliding in from the right as it is written. */
+@keyframes tape-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.tape-in {
+  animation: tape-in 260ms ease-out;
+}
+
+@keyframes halo-breathe {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+.halo-breathe {
+  animation: halo-breathe 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ripple,
+  .knock,
+  .bell-live,
+  .tape-in,
+  .halo-breathe {
+    animation: none;
+  }
+}
+
+/* Numbers on a trading floor are tabular or they are lies. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+::selection {
+  background: rgba(217, 164, 65, 0.35);
+}

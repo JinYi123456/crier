@@ -87,7 +87,7 @@ function scanFile(file: string): Hit[] {
       const code = character.codePointAt(0) ?? 0;
       if (code < 128) continue;
       if (code >= 0x2000 && code <= 0x2fff) continue; // dashes, arrows and other punctuation
-      if (scriptOf(character) === 'Latin') continue; // é, ø, ñ in a name are still English text
+      if (scriptOf(character) !== 'Other') continue; // é in a name and · in a caption are still English text
       hits.push({ file: shown, line: lineAt, text: character, why: 'non-Latin script' });
       break;
     }

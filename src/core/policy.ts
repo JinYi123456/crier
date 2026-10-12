@@ -178,7 +178,7 @@ export function quoteFor(input: QuoteInput): Quote | null {
           qty: takeQty,
           kind: 'ioc',
           reason: surplus >= tolerance * 3 ? 'crossing_spread' : 'closing_before_horizon',
-          voice: `${spec.name} takes ${ask} x${takeQty}`,
+          voice: `${spec.name} takes`,
           urgency,
         };
       }
@@ -196,17 +196,14 @@ export function quoteFor(input: QuoteInput): Quote | null {
         qty: sellQty,
         kind: 'ioc',
         reason: surplus >= tolerance * 3 ? 'crossing_spread' : 'closing_before_horizon',
-        voice: `${spec.name} hits ${bid} x${sellQty}`,
+        voice: `${spec.name} hits`,
         urgency,
       };
     }
   }
 
   const kind: OrderKind = 'limit';
-  const voice =
-    spec.role === 'buy'
-      ? `${spec.name} bids ${price} for ${qty}`
-      : `${spec.name} offers ${price} x${qty}`;
+  const voice = spec.role === 'buy' ? `${spec.name} bids` : `${spec.name} offers`;
 
   return { side: spec.role, priceMinor: price, qty, kind, reason: urgency > 0.75 ? 'late_concession' : 'curve', voice, urgency };
 }

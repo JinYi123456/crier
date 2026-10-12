@@ -1,0 +1,136 @@
+import { useState } from 'react';
+import type { SerializedTrade } from '../../core/world';
+import type { CurrencyCode } from '../../core/money';
+import { cash, clockOf } from './format';
+import { thump } from './sound';
+
+/**
+ * The pile in front of the human.
+ *
+ * A chit is a settlement that will not move until somebody reads it and decides. The rule that
+ * caught it is printed on the chit in plain words, because "held by rule concentration" is not a
+ * decision - "this seller is carrying 40% of the session" is. Refusing takes the money back out of
+ * escrow and says why on the tape; letting it through captures and pays the seller.
+ */
+
+export type TradeActionKind = 'release' | 'veto' | 'refund' | 'partial_refund' | 'payout';
+
+export default function ChitStack({
+  trades,
+  currency,
+  onAction,
+  busy,
+}: {
+  trades: readonly SerializedTrade[];
+  currency: CurrencyCode;
+  onAction: (action: TradeActionKind, tradeId: string, note?: string, amountMinor?: number) => Promise<string | null>;
+  busy: boolean;
+}): React.ReactElement {
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [flashing, setFlashing] = useState<string | null>(null);
+
+  async function decide(action: TradeActionKind, tradeId: string): Promise<void> {
+    setFlashing(`${action}:${tradeId}`);
+    const note = (notes[tradeId] ?? '').trim();
+    const failure = await onAction(action, tradeId, note.length > 0 ? note : undefined);
+    thump(failure === null ? (action === 'veto' ? [18, 40, 26] : 22) : [8, 30, 8]);
+    if (failure === null) setNotes((current) => ({ ...current, [tradeId]: '' }));
+    setTimeout(() => setFlashing(null), 500);
+  }
+
+  if (trades.length === 0) {
+    return (
+      <section className="brass-edge rounded-lg bg-felt/55 p-4">
+        <h3 className="font-display text-[16px] text-paper">The human pile</h3>
+        <p className="mt-3 rounded border border-dashed border-white/15 px-4 py-8 text-center text-[12.5px] text-white/35">
+          Nothing is waiting on a person. When a settlement trips a rule, or the processor is still
+          holding an order for its buyer, it lands here with the reason written on it.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="brass-edge rounded-lg bg-felt/55 p-4">
+      <div className="flex items-baseline justify-between">
+        <h3 className="font-display text-[16px] text-paper">The human pile</h3>
+        <span className="font-mono text-[11px] text-brass">{trades.length} chit(s)</span>
+      </div>
+      <ul className="mt-3 space-y-3">
+        {trades.map((trade, index) => {
+          const awaiting = trade.vetoRules.includes('awaiting_approval');
+          return (
+            <li
+              key={trade.id}
+              className="paper relative rounded p-3 transition"
+              style={{ transform: `rotate(${index % 2 === 0 ? -0.5 : 0.6}deg)` }}
+            >
+              <span className="absolute -top-2 left-1/2 h-4 w-10 -translate-x-1/2 rounded-sm bg-brass/70 shadow" aria-hidden="true" />
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#7a6a4f]">{trade.instrument}</span>
+                <span className="font-mono text-[15px] text-[#1d6a51] tnum">{cash(trade.grossMinor, currency)}</span>
+              </div>
+              <div className="mt-1 font-mono text-[11px] text-[#4a4238]">
+                {trade.buyer} <span className="text-[#a84d24]">→</span> {trade.seller}
+              </div>
+              <ul className="mt-2 space-y-1">
+                {trade.vetoReasons.length === 0 ? (
+                  <li className="text-[12px] text-[#4a4238]">held without a stated rule</li>
+                ) : (
+                  trade.vetoReasons.map((reason, position) => (
+                    <li key={`${trade.id}-${position}`} className="text-[12px] leading-snug text-[#3a3226]">
+                      <span className="mr-1 font-mono text-[10px] uppercase tracking-wide text-[#a84d24]">{trade.vetoRules[position] ?? 'rule'}</span>
+                      {reason}
+                    </li>
+                  ))
+                )}
+              </ul>
+              <div className="mt-1 font-mono text-[10px] text-[#7a6a4f]">
+                {trade.phase} · booked {clockOf(trade.createdAt)} · {trade.id.slice(-8)}
+              </div>
+              {awaiting && trade.approvalUrl !== null && (
+                <a
+                  href={trade.approvalUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 block rounded bg-[#1d6a51] px-2 py-1 text-center font-mono text-[11px] text-paper no-underline hover:bg-[#22795c]"
+                >
+                  the buyer still has the approval page open - open it
+                </a>
+              )}
+              <input
+                value={notes[trade.id] ?? ''}
+                onChange={(event) => setNotes((current) => ({ ...current, [trade.id]: event.target.value }))}
+                placeholder="say why, if you refuse it"
+                className="mt-2 w-full rounded border border-[#c4b795] bg-[#fbf6ea] px-2 py-1 font-mono text-[11.5px] text-[#26201a] outline-none placeholder:text-[#9c8f74]"
+              />
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void decide('release', trade.id)}
+                  className={`flex-1 rounded bg-[#1d6a51] px-2 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-paper transition hover:bg-[#22795c] disabled:opacity-40 ${
+                    flashing === `release:${trade.id}` ? 'knock' : ''
+                  }`}
+                >
+                  let it through
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || (trade.phase !== 'funded' && !awaiting)}
+                  onClick={() => void decide('veto', trade.id)}
+                  title={trade.phase === 'funded' ? 'void the order and give the buyer their money back' : `a ${trade.phase} trade has moved past a veto`}
+                  className={`flex-1 rounded bg-[#a84d24] px-2 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-paper transition hover:bg-[#b9582c] disabled:opacity-40 ${
+                    flashing === `veto:${trade.id}` ? 'knock' : ''
+                  }`}
+                >
+                  refuse it
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}

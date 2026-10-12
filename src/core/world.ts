@@ -18,7 +18,7 @@ import {
   type StrategyKind,
 } from './policy';
 import { SimGateway } from '../gateway/sim';
-import type { GatewayEvent, PaymentGateway } from '../gateway/types';
+import type { GatewayEvent, GatewayMode, PaymentGateway } from '../gateway/types';
 import { Settler, type SettlerSummary, type TradeRecord } from './settlement';
 
 /**
@@ -157,10 +157,14 @@ export interface SessionSnapshot {
   readonly session: string;
   readonly seed: string;
   readonly currency: CurrencyCode;
+  /** Which processor this room is talking to, because a screen has to say whether the money is real. */
+  readonly gateway: GatewayMode;
   readonly catalog: string;
   readonly startAt: number;
   readonly now: number;
   readonly tick: number;
+  /** The bell: how many rounds this floor was opened for. */
+  readonly maxTicks: number;
   readonly closed: boolean;
   readonly markets: {
     readonly instrumentId: string;
@@ -190,6 +194,8 @@ export interface SessionSnapshot {
     readonly quotesShouted: number;
     readonly fillsAsMaker: number;
     readonly fillsAsTaker: number;
+    /** How far along its concession curve this house is, 0-1. */
+    readonly pressure: number;
     readonly key: string;
   }[];
   readonly trades: SerializedTrade[];
@@ -363,7 +369,7 @@ export class Session {
       const reservationMinor = Math.max(targetMinor + tick, priceAt(ceilingBps));
       return {
         ...common,
-        name: `${name} buying ${instrument.name}`,
+        name,
         role,
         targetMinor,
         reservationMinor,
@@ -376,7 +382,7 @@ export class Session {
     const reservationMinor = Math.max(tick, Math.min(targetMinor - tick, priceAt(floorBps)));
     return {
       ...common,
-      name: `${name} selling ${instrument.name}`,
+      name,
       role,
       targetMinor,
       reservationMinor,
@@ -545,7 +551,7 @@ export class Session {
           // The resting side is the one that said yes to the shouted price.
           this.announce(
             'floor.accept',
-            { instrument: market.instrument.id, fill: fill.id, priceMinor: fill.priceMinor, party: fill.maker, voice: `done at ${fill.priceMinor}` },
+            { instrument: market.instrument.id, fill: fill.id, priceMinor: fill.priceMinor, party: fill.maker, voice: 'done' },
             maker?.identity ?? participant.identity,
           );
           trades.push(await this.onFill(market, fill));
@@ -710,7 +716,9 @@ export class Session {
       startAt: this.config.startAt,
       now: this.at(),
       tick: this.tick,
+      maxTicks: this.config.maxTicks,
       closed: this.closed,
+      gateway: this.gateway.mode,
       markets: this.markets.map((market) => ({
         instrumentId: market.instrument.id,
         openingMinor: market.openingMinor,
@@ -737,6 +745,8 @@ export class Session {
         quotesShouted: participant.state.quotesShouted,
         fillsAsMaker: participant.state.fillsAsMaker,
         fillsAsTaker: participant.state.fillsAsTaker,
+        /** How far along its concession curve this house is, so the pit can draw it as a halo. */
+        pressure: concessionProgress(participant.state, this.tick),
         key: participant.identity.publicKey,
       })),
       trades: this.trades.map(serializeTrade),

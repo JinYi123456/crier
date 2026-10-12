@@ -179,7 +179,7 @@ describe('deciding to cross', () => {
     const late = quoteFor({ state: newAgentState(spec), tick: 9, tickSizeMinor: 100, best, rng, minMarginMinor: 1_00 });
     expect(late?.kind).toBe('ioc');
     expect(late?.priceMinor).toBe(110_00);
-    expect(late?.voice).toBe('KESTREL takes 11000 x3');
+    expect(late?.voice).toBe('KESTREL takes');
   });
 
   it('refuses to cross a price above its own ceiling however late it is', () => {
