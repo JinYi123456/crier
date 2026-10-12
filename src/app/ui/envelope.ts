@@ -4,4 +4,6 @@ import type { SessionSnapshot } from '../../core/world';
 export interface Envelope {
   readonly snapshot: SessionSnapshot;
   readonly sinceSeq: number;
+  /** True when the server has an operator key set, so the desk will not move without it. */
+  readonly locked?: boolean;
 }

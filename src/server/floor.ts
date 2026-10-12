@@ -6,6 +6,7 @@ import { PayPalGateway } from '../gateway/paypal';
 import type { GatewayEvent, PaymentGateway } from '../gateway/types';
 import type { TradeRecord } from '../core/settlement';
 import type { SessionSnapshot } from '../core/world';
+import { deskIsLocked } from './operator';
 
 /**
  * The floor as a running service.
@@ -177,13 +178,14 @@ export function listFloors(): RoomSummary[] {
  * a hundred rounds, and the tape it gets back is the real sealed messages rather than a summary of
  * them - a screen that shows less than the log is a screen that can be lied to.
  */
-export function floorSnapshot(id: string, sinceSeq = -1): { snapshot: SessionSnapshot; sinceSeq: number } {
+export function floorSnapshot(id: string, sinceSeq = -1): { snapshot: SessionSnapshot; sinceSeq: number; locked: boolean } {
   const room = mustFind(id);
   const full = room.session.snapshot();
   const since = sinceSeq >= 0 ? sinceSeq : -1;
   return {
     snapshot: { ...full, messages: full.messages.filter((message) => message.seq > since) },
     sinceSeq: full.messages.length > 0 ? (full.messages[full.messages.length - 1] as { seq: number }).seq : since,
+    locked: deskIsLocked(),
   };
 }
 

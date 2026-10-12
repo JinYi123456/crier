@@ -156,9 +156,12 @@ be skipped by forgetting it.
 - **Not durable.** Rooms live in the process that opened them. A restart closes the floor. The
   recording is a single JSON document — **take the tape** in the audit room, or `--json` from the
   terminal — so a session is kept by writing it out, not by pointing this at a database.
-- **Not an operator console.** The human pile is one floor's pile. There are no roles, no
-  audit trail on the operator's own login, and no authentication on the mutation endpoints yet —
-  run this behind something, or only on your own machine.
+- **Not an operator console.** The human pile is one floor's pile, and there are no roles and no
+  audit trail on the operator's own login. Set `OPERATOR_TOKEN` and the desk stops moving money for
+  a caller who cannot quote the key — a release, a veto, a refund, a payout, an early bell and the
+  tamper demonstration all ask for it — while shouting at the book stays open to anybody, which is
+  what a pit is for. Unset, every action is open: run it that way on your own machine, and set the
+  key before pointing this at a public URL.
 - **Not a price forecast.** The agents have strategies, not alpha. The prices come from a seeded
   random walk off a bundled snapshot.
 

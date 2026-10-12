@@ -11,6 +11,7 @@ import SeatRing, { type Seat } from './SeatRing';
 import Tape from './Tape';
 import TradeRail from './TradeRail';
 import { cash, shortKey } from './format';
+import { readOperatorKey, rememberOperatorKey } from './operator';
 import { floorSound, thump } from './sound';
 import type { InstrumentCard } from './instruments';
 import type { Envelope } from './envelope';
@@ -44,7 +45,10 @@ export default function Pit({
   const [inspect, setInspect] = useState<SealedMessage | null>(null);
   const [tamper, setTamper] = useState<{ seq: number; total: number; first: readonly string[] } | null>(null);
   const [printFlash, setPrintFlash] = useState(0);
+  const [deskLocked, setDeskLocked] = useState(false);
+  const [keyDraft, setKeyDraft] = useState('');
   const busyRef = useRef(false);
+  const operatorKeyRef = useRef('');
   const seqRef = useRef(initial.sinceSeq);
   const printsRef = useRef(initial.snapshot.trades.length);
 
@@ -59,6 +63,13 @@ export default function Pit({
     if (sound) floorSound.cue(cue);
   }, [sound]);
 
+  // The key lives in the browser's own storage, which only exists after the page is on screen.
+  useEffect(() => {
+    const stored = readOperatorKey();
+    operatorKeyRef.current = stored;
+    setDeskLocked(initial.locked === true && stored.length === 0);
+  }, [initial.locked]);
+
   const pull = useCallback(
     async (since: number): Promise<void> => {
       const response = await fetch(`/api/floor/${encodeURIComponent(id)}?since=${since}`, { cache: 'no-store' });
@@ -68,6 +79,7 @@ export default function Pit({
         return;
       }
       const fresh = body.snapshot.messages;
+      if (body.locked !== undefined) setDeskLocked(body.locked && operatorKeyRef.current.length === 0);
       if (fresh.length > 0) {
         setMessages((current) => (since < 0 ? fresh : [...current, ...fresh]));
         const delta: Record<string, number> = {};
@@ -93,17 +105,34 @@ export default function Pit({
 
   const post = useCallback(
     async (payload: Record<string, unknown>): Promise<{ ok: boolean; body: Record<string, unknown>; error: string }> => {
+      const held = operatorKeyRef.current;
       const response = await fetch(`/api/floor/${encodeURIComponent(id)}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...(held.length > 0 ? { 'x-operator-token': held } : {}) },
         body: JSON.stringify(payload),
       });
       const body = (await response.json()) as Record<string, unknown>;
+      if (response.status === 401) {
+        // The key this browser offered did not open the desk. Forget it and ask again.
+        operatorKeyRef.current = '';
+        rememberOperatorKey('');
+        setDeskLocked(true);
+      }
       const error = typeof body.error === 'string' ? body.error : response.ok ? '' : 'the floor refused';
       return { ok: response.ok && error === '', body, error };
     },
     [id],
   );
+
+  const handOverKey = useCallback((): void => {
+    const given = keyDraft.trim();
+    if (given.length === 0) return;
+    operatorKeyRef.current = given;
+    rememberOperatorKey(given);
+    setKeyDraft('');
+    setDeskLocked(false);
+    setNotice({ text: 'the desk has the key: from here the floor acts on what you sign', bad: false });
+  }, [keyDraft]);
 
   const command = useCallback(
     async (action: 'step' | 'run' | 'close'): Promise<void> => {
@@ -260,6 +289,35 @@ export default function Pit({
 
       {notice !== null && (
         <p className={`mt-3 rounded px-3 py-2 text-[12.5px] ${notice.bad ? 'bg-alarm/15 text-alarm' : 'bg-brass/12 text-brass'}`}>{notice.text}</p>
+      )}
+
+      {deskLocked && (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            handOverKey();
+          }}
+          className="mt-3 flex flex-wrap items-center gap-2 rounded border border-brass/30 bg-brass/8 px-3 py-2"
+        >
+          <label htmlFor="operator-key" className="font-mono text-[11px] uppercase tracking-[0.18em] text-brass/85">
+            operator key
+          </label>
+          <input
+            id="operator-key"
+            type="password"
+            value={keyDraft}
+            onChange={(event) => setKeyDraft(event.target.value)}
+            autoComplete="off"
+            placeholder="this desk settles money on a named person's signature"
+            className="min-w-0 flex-1 rounded border border-white/15 bg-ink/60 px-2 py-1 font-mono text-[12px] text-white/80 outline-none focus:border-brass"
+          />
+          <button
+            type="submit"
+            className="rounded border border-brass/50 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.14em] text-brass transition hover:bg-brass/10"
+          >
+            hand it over
+          </button>
+        </form>
       )}
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(340px,1fr)]">

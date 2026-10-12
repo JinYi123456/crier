@@ -17,6 +17,7 @@ import type { SessionSnapshot } from '../src/core/world';
 import { computeSealHash, keyringFrom, verifyChain } from '../src/core/protocol';
 import { identityFromPublicKeyHex } from '../src/core/keys';
 import { GET } from '../src/app/api/floor/[id]/tape/route';
+import { POST } from '../src/app/api/floor/[id]/route';
 
 /**
  * The floor as a service.
@@ -227,5 +228,42 @@ describe('the floor as a service', () => {
   it('suggests a different seed every time', () => {
     expect(suggestedSeed()).not.toBe(suggestedSeed());
     expect(suggestedSeed()).toMatch(/^[0-9a-f-]{8}$/);
+  });
+});
+
+describe('the settlement desk', () => {
+  function post(id: string, body: Record<string, unknown>, key?: string): Promise<Response> {
+    return POST(new Request(`http://localhost/api/floor/${id}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(key === undefined ? {} : { 'x-operator-token': key }) },
+      body: JSON.stringify(body),
+    }), { params: Promise.resolve({ id }) });
+  }
+
+  it('lets anybody ring the bell, and only the operator decide what happens to the money', async () => {
+    process.env.OPERATOR_TOKEN = 'brass-key';
+    try {
+      const { id } = await floor('locked-desk', { instruments: ['coffee-green'], maxTicks: 3 });
+      expect(floorSnapshot(id).locked).toBe(true);
+
+      expect((await post(id, { action: 'step' })).status).toBe(200);
+
+      const stranger = await post(id, { action: 'close' });
+      expect(stranger.status).toBe(401);
+      expect(((await stranger.json()) as { error: string }).error).toContain('operator key');
+
+      expect((await post(id, { action: 'close' }, 'not-the-key')).status).toBe(401);
+      expect((await post(id, { action: 'trade', tradeId: 'trade_nobody' })).status).toBe(401);
+
+      const admitted = await post(id, { action: 'close' }, 'brass-key');
+      expect(admitted.status).toBe(200);
+    } finally {
+      delete process.env.OPERATOR_TOKEN;
+    }
+
+    // With no key set the floor is entirely open, which is how it runs on your own machine.
+    const { id } = await floor('open-desk', { instruments: ['coffee-green'], maxTicks: 3 });
+    expect(floorSnapshot(id).locked).toBe(false);
+    expect((await post(id, { action: 'close' })).status).toBe(200);
   });
 });

@@ -188,7 +188,7 @@ export default function DocsPage(): React.ReactElement {
         </li>
         <li className="flex flex-wrap gap-x-3">
           <span className="w-[190px] shrink-0 text-buy">POST /api/floor/&#123;id&#125;</span>
-          <span className="text-white/55">one round, run to the bell, close, and the human actions on a settlement</span>
+          <span className="text-white/55">one round, run to the bell, close, and the human actions on a settlement — once <span className="text-white/70">OPERATOR_TOKEN</span> is set, the ones that speak for the platform need it in an <span className="text-white/70">x-operator-token</span> header</span>
         </li>
         <li className="flex flex-wrap gap-x-3">
           <span className="w-[190px] shrink-0 text-buy">GET /api/floor/&#123;id&#125;/tape</span>
