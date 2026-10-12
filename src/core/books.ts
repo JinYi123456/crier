@@ -161,7 +161,7 @@ export function recordCapture(ledger: Ledger, input: CaptureInput): CaptureResul
 
   const { entry } = ledger.post({
     ts: input.ts,
-    memo: `Capture of order ${input.orderId}: ${netMinor} payable to ${input.seller}, ${feeMinor} fee`,
+    memo: `Capture of order ${input.orderId}: net payable to ${input.seller}, fee recognised`,
     code: 'TRADE_CAPTURE',
     currency: input.currency,
     idempotencyKey: `capture:${input.tradeId}`,
@@ -272,7 +272,7 @@ export function recordRefund(ledger: Ledger, input: RefundInput): RefundResult {
   return ledger.transaction(() => {
     const { entry: clawbackEntry } = ledger.post({
       ts: input.ts,
-      memo: `Refund ${input.refundId}: ${input.refundMinor} back to ${input.buyer}`,
+      memo: `Refund ${input.refundId} rebuilt as the buyer's claim`,
       code: 'REFUND_ISSUED',
       currency: input.currency,
       idempotencyKey: `refund-claim:${input.refundId}`,
