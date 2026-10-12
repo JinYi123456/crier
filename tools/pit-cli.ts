@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { formatMoney, type CurrencyCode, type Money } from '../src/core/money.ts';
 import { renderMoney } from '../src/core/money.ts';
 import { fingerprint } from '../src/core/canonical.ts';
-import { Session } from '../src/core/world.ts';
+import { DEFAULT_INSTRUMENTS, Session } from '../src/core/world.ts';
 import { INSTRUMENTS } from '../src/core/catalog.ts';
 import type { SealedMessage } from '../src/core/protocol.ts';
 import type { TradeRecord } from '../src/core/settlement.ts';
@@ -35,11 +35,11 @@ const USAGE = `crier - the floor without a screen
   --seed <text>          The market is a pure function of this. Default $CRIER_SEED.
   --ticks <n>            Rounds before the bell. Default 12.
   --agents <n>           Seats per side in each pit. Default 4.
-  --instruments <a,b>    Comma-separated catalogue ids. Default: the whole catalogue.
+  --instruments <a,b>    Comma-separated catalogue ids. Default: ${DEFAULT_INSTRUMENTS.join(', ')}.
   --currency <CODE>      Three-letter code the floor settles in. Default USD.
   --payout <mode>        immediate, or batched to hold the net in escrow. Default immediate.
   --json <file>          Write the session recording out for npm run audit:ledger.
-  --quiet                Print only the closing volume.
+  --quiet                Skip the round-by-round shouting; keep the prints and the closing volume.
 
   Ids: ${INSTRUMENTS.map((instrument) => instrument.id).join(', ')}.`;
 

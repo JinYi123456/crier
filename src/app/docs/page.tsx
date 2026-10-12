@@ -22,7 +22,7 @@ const STATIONS: readonly { readonly where: string; readonly head: string; readon
   {
     where: 'core/world.ts',
     head: 'The seats',
-    body: 'A seed picks the instruments, shuffles the houses into the pits, and gives each one a strategy, a reputation and a stack of money. The same seed on another machine seats the same houses with the same intentions - that is what makes a run reproducible rather than a story.',
+    body: 'Once the instruments are picked, the seed shuffles the houses into the pits, sets the opening print of each pit, and gives every seat a strategy, a reputation and a stack of money. The same seed on another machine seats the same houses with the same intentions - that is what makes a run reproducible rather than a story.',
     tone: 'text-buy',
   },
   {
