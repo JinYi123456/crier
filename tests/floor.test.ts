@@ -371,8 +371,11 @@ describe('a floor that comes back from its pointer', () => {
     expect(back.status).toBe(200);
     const one = (await back.json()) as { snapshot: SessionSnapshot; rebuilt?: boolean };
     expect(one.snapshot.tick).toBe(1);
-    // The answer says it had to rebuild, so a caller is not left assuming the desk came with the room.
+    // The answer says it had to replay, so a caller is not left assuming the desk came with the room -
+    // and a floor being opened at round nought is an opening, not a rebuild, so it says nothing.
     expect(one.rebuilt).toBe(true);
+    const fresh = await read(id, `${shape}&since=-1`);
+    expect(((await fresh.json()) as { rebuilt?: boolean }).rebuilt).toBe(false);
     const again = await read(id, `${shape}&round=1&since=-1`);
     expect(((await again.json()) as { rebuilt?: boolean }).rebuilt).toBe(false);
 

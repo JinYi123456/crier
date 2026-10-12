@@ -432,7 +432,9 @@ export async function roomForId(
   const opened = await openFloor(pointer, env);
   if (opened.session.session !== id) throw new FloorError('that pointer does not name this room', 404);
   await runToTick(id, round);
-  return { room: opened, rebuilt: true };
+  // A caller standing at round nought is opening a floor, not handing one over; only a named round
+  // means this machine had to replay history it never saw.
+  return { room: opened, rebuilt: round > 0 };
 }
 
 export async function closeFloor(id: string): Promise<RoomSummary> {
