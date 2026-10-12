@@ -82,7 +82,10 @@ export interface PaymentGateway {
   readonly mode: GatewayMode;
 
   createOrder(input: CreateOrderInput): Promise<PaymentOrder>;
-  /** Approve an order. In the sandbox a human does this in a browser; here the caller says so. */
+  /**
+   * Ask whether the buyer has approved. The local processor approves on request; the real one
+   * reports the truth, and throws `AwaitingApprovalError` while the buyer still has the page open.
+   */
   approveOrder(reference: string): Promise<PaymentOrder>;
   captureOrder(reference: string): Promise<PaymentOrder>;
   voidOrder(reference: string, reason: string): Promise<PaymentOrder>;
@@ -108,5 +111,22 @@ export class GatewayError extends Error {
     this.name = 'GatewayError';
     this.status = status;
     this.detail = detail;
+  }
+}
+
+/**
+ * The buyer has not approved the order yet, so the processor cannot take the money.
+ *
+ * This is not a fault: it is a settlement waiting on a person, and the caller's job is to hold the
+ * trade and put an approval link in front of somebody. The processor's queue and our veto queue
+ * are the same shape for that reason, and the pit shows them the same way.
+ */
+export class AwaitingApprovalError extends GatewayError {
+  readonly approvalUrl: string | null;
+
+  constructor(reference: string, approvalUrl: string | null) {
+    super(`order ${reference} is waiting for the buyer to approve it on the processor's site`, 409, { approvalUrl });
+    this.name = 'AwaitingApprovalError';
+    this.approvalUrl = approvalUrl;
   }
 }

@@ -15,7 +15,7 @@ import { Ledger, LedgerError, type LedgerEntry } from './ledger';
 import { assertMinor, type CurrencyCode } from './money';
 import type { Identity } from './keys';
 import { append, type ChainState, type MessageType, type SealedMessage } from './protocol';
-import { GatewayError, type GatewayEvent, type PaymentGateway } from '../gateway/types';
+import { AwaitingApprovalError, GatewayError, type GatewayEvent, type PaymentGateway, type PaymentOrder } from '../gateway/types';
 
 /**
  * From a print on the board to money in the seller's account.
@@ -91,6 +91,12 @@ export const MIN_REPUTATION_BPS = 3_000;
 export const SESSION_EXPOSURE_CAP_MINOR = 2_000_00;
 /** Most trades on a floor are between strangers, so only a large first ticket earns a look. */
 export const FIRST_PAIRING_REVIEW_MINOR = 1_000_00;
+/**
+ * Not one of our rules - the processor's own hold, reported as if it were one. A live order the
+ * buyer has not approved is exactly as un-settled as a trade an operator has not signed off, and
+ * putting both on the same pile is what makes the queue worth reading.
+ */
+export const AWAITING_APPROVAL_RULE = 'awaiting_approval';
 
 export const DEFAULT_VETO_RULES: readonly VetoRule[] = [
   {
@@ -200,6 +206,8 @@ export interface TradeRecord {
   held: boolean;
   vetoRules: string[];
   vetoReasons: string[];
+  /** Where the buyer approves a live order, while the processor is still waiting for them. */
+  approvalUrl: string | null;
   vetoNote: string | null;
   failure: string | null;
   steps: TradeStep[];
@@ -363,6 +371,7 @@ export class Settler {
       held: false,
       vetoRules: [],
       vetoReasons: [],
+      approvalUrl: null,
       vetoNote: null,
       failure: null,
       steps: [],
@@ -465,6 +474,7 @@ export class Settler {
     }
     trade.vetoNote = note;
     trade.held = false;
+    trade.approvalUrl = null;
     this.say(trade, 'human.veto', { note, grossMinor: trade.grossMinor, final: true }, this.deps.human);
     if (!trade.orderId) throw new SettlementError(`trade ${tradeId} has no order to void`, tradeId);
 
@@ -488,7 +498,17 @@ export class Settler {
     if (!trade.orderId) throw new SettlementError(`trade ${trade.id} was never funded`, trade.id);
     if (trade.phase !== 'funded') return;
 
-    const approved = await this.deps.gateway.approveOrder(trade.orderId);
+    let approved: PaymentOrder;
+    try {
+      approved = await this.deps.gateway.approveOrder(trade.orderId);
+    } catch (error) {
+      if (error instanceof AwaitingApprovalError) {
+        this.awaitBuyer(trade, error.approvalUrl);
+        return;
+      }
+      throw error;
+    }
+    trade.approvalUrl = null;
     if (approved.status === 'declined') {
       const reason = approved.declinedReason ?? 'declined';
       this.say(trade, 'order.failed', { stage: 'approve', orderId: approved.reference, reason });
@@ -537,6 +557,30 @@ export class Settler {
     this.tellEntries(trade, captureEntries);
 
     if (this.payoutMode === 'immediate') await this.payout(trade);
+  }
+
+  /**
+   * The processor said the buyer has not approved yet.
+   *
+   * The trade goes back on the pile with the link in it, unchanged in every other respect: still
+   * funded, still on the books as somebody's claim, and still one click from a capture. Trying
+   * again is the whole retry story, so the operator pressing the same card later is safe.
+   */
+  private awaitBuyer(trade: TradeRecord, approvalUrl: string | null): void {
+    trade.held = true;
+    trade.approvalUrl = approvalUrl;
+    if (!trade.vetoRules.includes(AWAITING_APPROVAL_RULE)) {
+      trade.vetoRules.push(AWAITING_APPROVAL_RULE);
+      trade.vetoReasons.push(`order ${trade.orderId} is still open on the processor's site`);
+    }
+    trade.updatedAt = this.deps.now();
+    this.say(trade, 'human.veto', {
+      pending: true,
+      rules: trade.vetoRules.join(','),
+      reasons: trade.vetoReasons.join(' | '),
+      grossMinor: trade.grossMinor,
+      approvalUrl: approvalUrl ?? '',
+    });
   }
 
   /**

@@ -144,6 +144,8 @@ export interface SerializedTrade {
   readonly held: boolean;
   readonly vetoRules: string[];
   readonly vetoReasons: string[];
+  /** Where the buyer approves a live order. Only present while the processor is still waiting. */
+  readonly approvalUrl: string | null;
   readonly vetoNote: string | null;
   readonly failure: string | null;
   readonly steps: { phase: string; at: number; note: string }[];
@@ -778,6 +780,7 @@ function serializeTrade(trade: TradeRecord): SerializedTrade {
     held: trade.held,
     vetoRules: [...trade.vetoRules],
     vetoReasons: [...trade.vetoReasons],
+    approvalUrl: trade.approvalUrl,
     vetoNote: trade.vetoNote,
     failure: trade.failure,
     steps: trade.steps.map((step) => ({ phase: step.phase, at: step.at, note: step.note })),

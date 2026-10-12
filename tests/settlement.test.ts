@@ -4,8 +4,9 @@ import { Ledger } from '../src/core/ledger';
 import { ACCOUNT, openBooks } from '../src/core/books';
 import { identityFromSeed } from '../src/core/keys';
 import { newChain, verifyChain, keyringFrom } from '../src/core/protocol';
-import { Settler, SettlementError, evaluateVeto, AUTO_SETTLE_LIMIT_MINOR, FIRST_PAIRING_REVIEW_MINOR } from '../src/core/settlement';
+import { Settler, SettlementError, evaluateVeto, AUTO_SETTLE_LIMIT_MINOR, AWAITING_APPROVAL_RULE, FIRST_PAIRING_REVIEW_MINOR } from '../src/core/settlement';
 import type { TradeInput } from '../src/core/settlement';
+import { AwaitingApprovalError, type PaymentGateway } from '../src/gateway/types';
 
 const exchange = identityFromSeed('test-seed', 'exchange');
 const human = identityFromSeed('test-seed', 'human');
@@ -23,7 +24,15 @@ interface Harness {
  * A clock that only moves forward when the harness is asked, so the chain never reports a
  * clock regression and a test can name the exact timestamps it expects.
  */
-function harness(options: { reviewAboveMinor?: number; declineBps?: number; floatMinor?: number; payoutMode?: 'immediate' | 'batched' } = {}): Harness {
+function harness(
+  options: {
+    reviewAboveMinor?: number;
+    declineBps?: number;
+    floatMinor?: number;
+    payoutMode?: 'immediate' | 'batched';
+    wrap?: (gateway: SimGateway) => PaymentGateway;
+  } = {},
+): Harness {
   let now = 1_700_000_000_000;
   const ledger = new Ledger();
   openBooks(ledger, { currency: 'USD', feeSchedule: { bps: 299, fixedMinor: 30 }, openingFloatMinor: options.floatMinor ?? 5_000_00 }, now);
@@ -31,7 +40,7 @@ function harness(options: { reviewAboveMinor?: number; declineBps?: number; floa
   const chain = newChain();
   const settler = new Settler({
     ledger,
-    gateway,
+    gateway: options.wrap ? options.wrap(gateway) : gateway,
     chain,
     session: 'sess_test',
     exchange,
@@ -58,6 +67,29 @@ function trade(overrides: Partial<TradeInput> = {}): TradeInput {
     priorPairing: 1,
     ...overrides,
   };
+}
+
+/**
+ * A processor that behaves like the real thing: creating an order is not a payment, and nothing
+ * can be captured until the buyer has approved out of band.
+ */
+function buyerControlled(gateway: SimGateway): { readonly gate: PaymentGateway; approve: () => void } {
+  const state = { waiting: true };
+  const gate: PaymentGateway = {
+    mode: 'sandbox',
+    createOrder: (input) => gateway.createOrder(input),
+    async approveOrder(reference) {
+      if (state.waiting) throw new AwaitingApprovalError(reference, `https://sandbox.paypal.com/checkoutnow?token=${reference}`);
+      return gateway.approveOrder(reference);
+    },
+    captureOrder: (reference) => gateway.captureOrder(reference),
+    voidOrder: (reference, reason) => gateway.voidOrder(reference, reason),
+    refund: (reference, amount, reason) => gateway.refund(reference, amount, reason),
+    payout: (recipient, amount, note) => gateway.payout(recipient, amount, note),
+    listWaiting: () => gateway.listWaiting(),
+    verifyWebhook: (headers, rawBody) => gateway.verifyWebhook(headers, rawBody),
+  };
+  return { gate, approve: () => (state.waiting = false) };
 }
 
 describe('settlement pipeline', () => {
@@ -276,6 +308,49 @@ describe('settlement pipeline', () => {
     const capture = hooks.find((message) => message.payload.eventType === 'PAYMENT.CAPTURE.COMPLETED');
     expect(capture?.payload.tradeId).toBe(record.id);
     expect(verifyChain(h.chain.messages, keyringFrom([exchange, human])).ok).toBe(true);
+  });
+
+  it('holds a settlement while the buyer still has the approval page open, then finishes it', async () => {
+    const box: { control?: { approve: () => void } } = {};
+    const h = harness({
+      wrap: (gateway) => {
+        const opened = buyerControlled(gateway);
+        box.control = opened;
+        return opened.gate;
+      },
+    });
+    const settled = await h.settler.settle(trade());
+    expect(settled.phase).toBe('funded');
+    expect(settled.held).toBe(true);
+    expect(settled.vetoRules).toContain(AWAITING_APPROVAL_RULE);
+    expect(settled.approvalUrl).toContain('checkoutnow');
+    // Nothing has been taken: the buyer's money is still escrow and still their claim.
+    expect(h.ledger.balanceOf(ACCOUNT.escrow)).toBe(settled.grossMinor);
+    expect(h.ledger.balanceOf(ACCOUNT.dueToBuyer(buyer.actor))).toBe(settled.grossMinor);
+    expect(h.ledger.isBalanced()).toBe(true);
+
+    box.control?.approve();
+    const released = await h.settler.release(settled.id);
+    expect(released.phase).toBe('paid_out');
+    expect(released.held).toBe(false);
+    expect(released.approvalUrl).toBeNull();
+    expect(h.ledger.balanceOf(ACCOUNT.escrow)).toBe(0);
+    expect(h.ledger.audit()).toEqual([]);
+    const pending = h.chain.messages.filter((message) => message.type === 'human.veto' && message.payload.pending === true);
+    expect(pending).toHaveLength(1);
+    expect(pending[0]?.payload.rules).toContain(AWAITING_APPROVAL_RULE);
+  });
+
+  it('voids an order the buyer never approved when the operator refuses it', async () => {
+    const h = harness({ wrap: (gateway) => buyerControlled(gateway).gate });
+    const held = await h.settler.settle(trade({ tradeId: 'trade_stranger' }));
+    expect(held.held).toBe(true);
+    const vetoed = await h.settler.veto(held.id, 'a first trade between strangers at this size');
+    expect(vetoed.phase).toBe('voided');
+    expect(vetoed.approvalUrl).toBeNull();
+    expect(h.ledger.balanceOf(ACCOUNT.escrow)).toBe(0);
+    expect(h.ledger.balanceOf(ACCOUNT.dueToBuyer('buyer-kestrel'))).toBe(0);
+    expect(h.ledger.audit()).toEqual([]);
   });
 });
 
