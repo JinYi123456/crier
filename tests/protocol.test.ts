@@ -101,6 +101,17 @@ describe('the signed chain', () => {
     expect(result.verifiedUpToSeq).toBe(2);
   });
 
+  it('names a line the canonical form refuses rather than crashing on it', () => {
+    const chain = honestChain();
+    const damaged = chain.messages.map((m, i) => (i === 2 ? ({ ...m, payload: { ...m.payload, qty: 1.5 } } as SealedMessage) : m));
+    const result = verifyChain(damaged, keyring);
+    const codes = result.findings.map((f) => f.code);
+    expect(codes).toContain('payload_not_canonical');
+    expect(codes).toContain('chain_break');
+    expect(result.findings.find((f) => f.code === 'payload_not_canonical')?.seq).toBe(2);
+    expect(result.verifiedUpToSeq).toBe(1);
+  });
+
   it('notices a message that was deleted', () => {
     const chain = honestChain();
     const cut = chain.messages.filter((_, i) => i !== 4);

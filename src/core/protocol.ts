@@ -196,7 +196,9 @@ function publicKeyOf(publicKeyHex: string): KeyObject | undefined {
 
 /**
  * Walk the chain and report every break. Total function - it never throws, because the
- * audit screen has to explain a damaged log instead of crashing on it.
+ * audit screen has to explain a damaged log instead of crashing on it. That includes a line
+ * the canonical form refuses: it gets named, and the walk carries on past it so the audit
+ * reads as far as the damage reaches.
  */
 export function verifyChain(messages: readonly SealedMessage[], keyring: Keyring): VerificationResult {
   const findings: Finding[] = [];
@@ -213,12 +215,6 @@ export function verifyChain(messages: readonly SealedMessage[], keyring: Keyring
     };
     failedHere = false;
 
-    try {
-      canonicalJson(message.payload);
-    } catch {
-      push('payload_not_canonical', 'payload holds a value that cannot be canonically represented');
-    }
-
     if (message.v !== PROTOCOL_VERSION) push('body_hash_mismatch', `protocol version ${message.v} is not ${PROTOCOL_VERSION}`);
 
     const registered = keyring.keys.get(message.actor);
@@ -227,13 +223,22 @@ export function verifyChain(messages: readonly SealedMessage[], keyring: Keyring
       push('key_mismatch', `${message.actor} spoke with ${message.key.slice(0, 12)}…, but its registered key is ${registered.slice(0, 12)}…`);
     }
 
-    if (computeBodyHash(message) !== message.bodyHash) {
-      push('body_hash_mismatch', `${message.type} at seq ${message.seq} does not hash to the recorded bodyHash - its content was edited`);
-    } else {
-      const key = publicKeyOf(registered ?? message.key);
-      if (!key) push('signature_invalid', 'no usable public key for this actor');
-      else if (!verifyHex(message.sig, signingInput(message), key)) {
-        push('signature_invalid', `${message.type} at seq ${message.seq} carries a signature that ${message.actor}'s key does not verify`);
+    let bodyHash: string | undefined;
+    try {
+      bodyHash = computeBodyHash(message);
+    } catch (error) {
+      push('payload_not_canonical', `${message.type} at seq ${message.seq} holds what the canonical form refuses: ${(error as Error).message}`);
+    }
+
+    if (bodyHash !== undefined) {
+      if (bodyHash !== message.bodyHash) {
+        push('body_hash_mismatch', `${message.type} at seq ${message.seq} does not hash to the recorded bodyHash - its content was edited`);
+      } else {
+        const key = publicKeyOf(registered ?? message.key);
+        if (!key) push('signature_invalid', 'no usable public key for this actor');
+        else if (!verifyHex(message.sig, signingInput(message), key)) {
+          push('signature_invalid', `${message.type} at seq ${message.seq} carries a signature that ${message.actor}'s key does not verify`);
+        }
       }
     }
 
@@ -252,7 +257,12 @@ export function verifyChain(messages: readonly SealedMessage[], keyring: Keyring
 
     lastTs = Math.max(lastTs, message.ts);
     expectedSeq = Math.max(expectedSeq, message.seq) + 1;
-    expectedPrevHash = computeSealHash(message);
+    try {
+      expectedPrevHash = computeSealHash(message);
+    } catch {
+      // Nothing a real seal can equal, so the successor reads as detached - which is the truth.
+      expectedPrevHash = '';
+    }
   });
 
   return { ok: findings.length === 0, findings, count: messages.length, verifiedUpToSeq };
