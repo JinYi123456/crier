@@ -18,7 +18,8 @@
     "test:e2e": "playwright test",
     "pit": "tsx tools/pit-cli.ts",
     "verify": "npm run typecheck && npm run test && tsx tools/language-audit.ts && npm run build",
-    "audit:ledger": "tsx tools/ledger-audit.ts"
+    "audit:ledger": "tsx tools/ledger-audit.ts",
+    "smoke": "tsx tools/sandbox-smoke.ts"
   },
   "dependencies": {
     "@paypal/paypal-js": "11.2.2",

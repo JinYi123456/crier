@@ -245,6 +245,25 @@ describe('paypal gateway', () => {
     await expect(paypal.createOrder(input({ currency: 'XYZ' }))).rejects.toThrow(/does not settle/);
   });
 
+  it('sends the buyer back to a real address, not a half-written one', async () => {
+    const withUrl = gateway();
+    await withUrl.paypal.createOrder(input());
+    const body = withUrl.fake.calls.find((call) => call.path === '/v2/checkout/orders')?.body as {
+      payment_source: { paypal: { experience_context: { return_url: string; cancel_url: string } } };
+    };
+    expect(body.payment_source.paypal.experience_context.return_url).toBe('https://crier.example/checkout/return?trade=trade_0001');
+
+    const blank = fakePaypal();
+    const local = new PayPalGateway({ clientId: 'a', clientSecret: 'b', publicUrl: '', fetchImpl: blank.fetch });
+    await local.createOrder(input());
+    const fallback = blank.calls.find((call) => call.path === '/v2/checkout/orders')?.body as {
+      payment_source: { paypal: { experience_context: { return_url: string } } };
+    };
+    expect(fallback.payment_source.paypal.experience_context.return_url).toBe('http://localhost:3000/checkout/return?trade=trade_0001');
+
+    expect(() => new PayPalGateway({ clientId: 'a', clientSecret: 'b', publicUrl: 'localhost:3000', fetchImpl: blank.fetch })).toThrow(/full http\(s\) url/);
+  });
+
   it('retries a settlement without ever creating a second charge', async () => {
     const { paypal, fake } = gateway();
     const first = await paypal.createOrder(input());

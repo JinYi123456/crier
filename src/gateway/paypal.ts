@@ -181,7 +181,14 @@ export class PayPalGateway implements PaymentGateway {
     this.secret = options.clientSecret;
     this.base = (options.apiBase ?? (options.live ? LIVE_API_BASE : SANDBOX_API_BASE)).replace(/\/+$/, '');
     this.webhookId = options.webhookId && options.webhookId.length > 0 ? options.webhookId : null;
-    this.publicUrl = (options.publicUrl ?? 'http://localhost:3000').replace(/\/+$/, '');
+    // An empty public url is the documented default, not a mistake; anything that is not an
+    // absolute http(s) address would be rejected by PayPal as a malformed return url, so we say so
+    // here instead of three calls later.
+    const configured = (options.publicUrl ?? '').trim();
+    if (configured.length > 0 && !/^https?:\/\/[^/]+/i.test(configured)) {
+      throw new GatewayError(`the app's public address must be a full http(s) url, got "${configured}"`, 500);
+    }
+    this.publicUrl = configured.length > 0 ? configured.replace(/\/+$/, '') : 'http://localhost:3000';
     this.payoutBatchNote = options.payoutBatchNote ?? 'Crier settlement';
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.clock = options.now ?? (() => Date.now());
@@ -238,7 +245,7 @@ export class PayPalGateway implements PaymentGateway {
   private refusal(status: number, parsed: unknown, raw: string, method: string, path: string): GatewayError {
     const body = (parsed ?? {}) as PayPalErrorBody;
     const detail = (body.details ?? [])
-      .map((d) => d.description ?? d.issue ?? d.field ?? '')
+      .map((d) => `${typeof d.field === 'string' && d.field.length > 0 ? `${d.field}: ` : ''}${d.description ?? d.issue ?? ''}`)
       .filter((line) => line.length > 0)
       .join('; ');
     const message = [body.name, body.message].filter((line) => typeof line === 'string' && line.length > 0).join(' - ');
