@@ -157,15 +157,18 @@ be skipped by forgetting it.
   running. What it does not lose is the recording: every round is a pure function of the seed and the
   shape the id was hashed from, so a URL that carries that pointer — `?seed=…&instruments=…&ticks=…`
   — is answered by any machine, warmed or brand new, and the tape it paints is the same tape, line for
-  line and seal for seal. That is a replay, not a desk: a decision somebody signed at the desk after
-  the rounds is not in the seed, so a rebuilt room has not seen it. Take the tape in the audit room,
-  or `--json` from the terminal, for the whole session as one signed document.
+  line and seal for seal. A screen quotes the pointer on every request and keeps it in the address bar,
+  so a floor on a platform that spreads requests over several boxes - or one that answers from a cold
+  start - is the same floor. That is a replay, not a desk: a decision somebody signed at the desk after
+  the rounds is not in the seed, so a rebuilt room has not seen it, and the answer says when it rebuilt.
+  Take the tape in the audit room, or `--json` from the terminal, for the whole session as one document.
 - **Not an operator console.** The human pile is one floor's pile, and there are no roles and no
   audit trail on the operator's own login. Set `OPERATOR_TOKEN` and the desk stops moving money for
   a caller who cannot quote the key — a release, a veto, a refund, a payout, an early bell and the
   tamper demonstration all ask for it — while shouting at the book stays open to anybody, which is
-  what a pit is for. Unset, every action is open: run it that way on your own machine, and set the
-  key before pointing this at a public URL.
+  what a pit is for. Unset, every action is open. The hosted demonstration runs that way on purpose:
+  its processor is the local one, so the only money that moves is play money inside one floor's own
+  ledger. Attach real credentials and the sentence reverses — set the key first, then the URL.
 - **Not a price forecast.** The agents have strategies, not alpha. The prices come from a seeded
   random walk off a bundled snapshot.
 
