@@ -1,0 +1,45 @@
+{
+  "name": "crier",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Crier — an open-outcry trading floor where autonomous agents negotiate, match, and settle payments under a double-entry ledger and a signed, tamper-evident message chain.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "npm run typecheck && tsx tools/language-audit.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "pit": "tsx tools/pit-cli.ts",
+    "verify": "npm run typecheck && npm run test && tsx tools/language-audit.ts && npm run build",
+    "audit:ledger": "tsx tools/ledger-audit.ts"
+  },
+  "dependencies": {
+    "@paypal/paypal-js": "11.2.2",
+    "ag-grid-community": "36.2.0",
+    "ag-grid-react": "36.2.0",
+    "clsx": "2.1.1",
+    "framer-motion": "14.1.0",
+    "next": "16.4.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.0",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "24.10.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "postcss": "8.5.6",
+    "tailwindcss": "4.3.3",
+    "tsx": "^4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

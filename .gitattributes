@@ -1,0 +1,5 @@
+# The repository is authored with LF endings; Windows checkouts should not rewrite them.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary

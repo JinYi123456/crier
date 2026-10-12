@@ -1,0 +1,31 @@
+# dependencies
+/node_modules
+
+# build output
+/.next
+/.next-build
+/out
+/standalone
+
+# test artefacts
+/coverage
+/test-results
+/playwright-report
+/.playwright-cache
+
+# local state and secrets
+/data
+/shots
+.env
+.env.*
+!.env.example
+
+# editors and operating system noise
+.DS_Store
+*.log
+npm-debug.log*
+.idea
+.vscode
+
+# typescript incremental build info
+*.tsbuildinfo
