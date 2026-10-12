@@ -5,6 +5,7 @@ import { formatMoney, type CurrencyCode, type Money } from '../src/core/money.ts
 import { renderMoney } from '../src/core/money.ts';
 import { fingerprint } from '../src/core/canonical.ts';
 import { Session } from '../src/core/world.ts';
+import { INSTRUMENTS } from '../src/core/catalog.ts';
 import type { SealedMessage } from '../src/core/protocol.ts';
 import type { TradeRecord } from '../src/core/settlement.ts';
 
@@ -26,6 +27,21 @@ interface Options {
   json: string | null;
   quiet: boolean;
 }
+
+const USAGE = `crier - the floor without a screen
+
+  npm run pit -- [flags]
+
+  --seed <text>          The market is a pure function of this. Default $CRIER_SEED.
+  --ticks <n>            Rounds before the bell. Default 12.
+  --agents <n>           Seats per side in each pit. Default 4.
+  --instruments <a,b>    Comma-separated catalogue ids. Default: the whole catalogue.
+  --currency <CODE>      Three-letter code the floor settles in. Default USD.
+  --payout <mode>        immediate, or batched to hold the net in escrow. Default immediate.
+  --json <file>          Write the session recording out for npm run audit:ledger.
+  --quiet                Print only the closing volume.
+
+  Ids: ${INSTRUMENTS.map((instrument) => instrument.id).join(', ')}.`;
 
 function parseArgs(argv: readonly string[]): Options {
   const options: Options = {
@@ -73,8 +89,13 @@ function parseArgs(argv: readonly string[]): Options {
       case '--quiet':
         options.quiet = true;
         break;
-      default:
+      case '-h':
+      case '--help':
+        console.log(USAGE);
+        process.exit(0);
         break;
+      default:
+        throw new Error(`nothing answers to ${argument} - try --help`);
     }
   }
   if (!Number.isInteger(options.ticks) || options.ticks < 1) throw new Error('--ticks wants a whole number of rounds');

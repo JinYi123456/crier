@@ -32,7 +32,6 @@ const TONE_OF: Partial<Record<MessageType, Tone>> = {
   'ledger.entry': 'quiet',
   'human.veto': 'human',
   'human.release': 'human',
-  'human.override': 'human',
   'webhook.received': 'processor',
 };
 
@@ -134,8 +133,6 @@ export function gist(message: SealedMessage, currency: CurrencyCode): string {
           : `human veto - ${field(p, 'note')}`;
     case 'human.release':
       return `HUMAN LET IT THROUGH - ${field(p, 'note')}`;
-    case 'human.override':
-      return `human override - ${field(p, 'note')}`;
     case 'webhook.received':
       return `processor says ${field(p, 'eventType')} about ${shortKey(field(p, 'resourceId'))}`;
     default:

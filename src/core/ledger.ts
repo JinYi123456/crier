@@ -39,7 +39,6 @@ export interface Posting {
 }
 
 export type EntryCode =
-  | 'BUYER_DEPOSIT'
   | 'ESCROW_HOLD'
   | 'TRADE_CAPTURE'
   | 'PLATFORM_FEE'

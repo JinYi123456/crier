@@ -1,4 +1,4 @@
-import { createPrivateKey, createPublicKey, generateKeyPairSync, sign as nodeSign, verify as nodeVerify, type KeyObject } from 'node:crypto';
+import { createPrivateKey, createPublicKey, sign as nodeSign, verify as nodeVerify, type KeyObject } from 'node:crypto';
 import { sha256Hex } from './canonical';
 
 /**
@@ -46,17 +46,6 @@ export function identityFromSeed(masterSeed: string, actor: string): Identity {
   };
 }
 
-export function randomIdentity(actor: string): Identity {
-  const { privateKey, publicKey } = generateKeyPairSync('ed25519');
-  const der = publicKey.export({ format: 'der', type: 'spki' }) as Buffer;
-  return {
-    actor,
-    publicKey: der.subarray(der.length - 32).toString('hex'),
-    privateKey,
-    publicKeyObject: publicKey,
-  };
-}
-
 export function identityFromPublicKeyHex(actor: string, publicKeyHex: string): Identity {
   return {
     actor,
@@ -90,8 +79,4 @@ export function verifyHex(signatureHex: string, message: string, publicKey: KeyO
   } catch {
     return false;
   }
-}
-
-export function publicKeyHexToObject(publicKeyHex: string): KeyObject {
-  return identityFromPublicKeyHex('peer', publicKeyHex).publicKeyObject;
 }

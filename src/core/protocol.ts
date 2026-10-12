@@ -40,7 +40,6 @@ export type MessageType =
   | 'ledger.entry'
   | 'human.veto'
   | 'human.release'
-  | 'human.override'
   | 'webhook.received';
 
 export interface ChainBody {
@@ -257,16 +256,4 @@ export function verifyChain(messages: readonly SealedMessage[], keyring: Keyring
   });
 
   return { ok: findings.length === 0, findings, count: messages.length, verifiedUpToSeq };
-}
-
-export function chainToJsonl(messages: readonly SealedMessage[]): string {
-  return messages.map((message) => JSON.stringify(message)).join('\n');
-}
-
-export function chainFromJsonl(text: string): SealedMessage[] {
-  return text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as SealedMessage);
 }
