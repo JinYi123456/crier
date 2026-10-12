@@ -114,6 +114,13 @@ export default function AuditRoom({
           >
             back to the pit
           </a>
+          <a
+            href={`/api/floor/${encodeURIComponent(id)}/tape`}
+            download={`${id}.tape.json`}
+            className="rounded border border-white/20 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-white/70 no-underline hover:border-brass hover:text-brass"
+          >
+            take the tape
+          </a>
           <button
             type="button"
             onClick={() => void reread()}

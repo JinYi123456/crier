@@ -158,9 +158,10 @@ export default function DocsPage(): React.ReactElement {
       </div>
       <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
         <p className="text-[13.5px] leading-relaxed text-white/60">
-          The tape is the record. Export a session and you hold every shout, print, hold, signature and posting it produced - nothing about
-          the run lives only in this process. A stranger with the file, and no access to the machine that made it, can re-derive the balances
-          from the postings, floor every account against the ledger, and walk the chain using only the public keys visible inside it.
+          The tape is the record. Take it from the audit room — or write it out with <code className="text-white/70">--json</code> — and you
+          hold every shout, print, hold, signature and posting the session produced; nothing about the run lives only in this process. A
+          stranger with the file, and no access to the machine that made it, can re-derive the balances from the postings, floor every account
+          against the ledger, and walk the chain using only the public keys visible inside it.
         </p>
         <div className="rounded-lg bg-black/45 p-4 font-mono text-[12px] leading-relaxed text-white/70">
           <div className="text-white/40"># play a session and keep its tape</div>
@@ -187,7 +188,11 @@ export default function DocsPage(): React.ReactElement {
         </li>
         <li className="flex flex-wrap gap-x-3">
           <span className="w-[190px] shrink-0 text-buy">POST /api/floor/&#123;id&#125;</span>
-          <span className="text-white/55">one round, run to the bell, close, and the four human actions on a settlement</span>
+          <span className="text-white/55">one round, run to the bell, close, and the human actions on a settlement</span>
+        </li>
+        <li className="flex flex-wrap gap-x-3">
+          <span className="w-[190px] shrink-0 text-buy">GET /api/floor/&#123;id&#125;/tape</span>
+          <span className="text-white/55">the whole recording as a file, in the format the auditor reads</span>
         </li>
         <li className="flex flex-wrap gap-x-3">
           <span className="w-[190px] shrink-0 text-sell">POST /api/webhooks/paypal</span>

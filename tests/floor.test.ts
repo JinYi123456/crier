@@ -13,15 +13,18 @@ import {
   webhookGateway,
 } from '../src/server/floor';
 import type { GatewayEvent } from '../src/gateway/types';
-import { verifyChain } from '../src/core/protocol';
+import type { SessionSnapshot } from '../src/core/world';
+import { computeSealHash, keyringFrom, verifyChain } from '../src/core/protocol';
+import { identityFromPublicKeyHex } from '../src/core/keys';
+import { GET } from '../src/app/api/floor/[id]/tape/route';
 
 /**
  * The floor as a service.
  *
  * These tests hold the room the way a browser does - open it, ring the bell, read the snapshot, do
- * the four human things to a trade, then try to fake the tape and hand it a webhook. Nothing here
- * reaches for credentials: the local processor plays its part, which is the point of the room being
- * watchable with nothing installed.
+ * the human things to a trade, take the tape away and try to fake it, then hand the floor a webhook.
+ * Nothing here reaches for credentials: the local processor plays its part, which is the point of
+ * the room being watchable with nothing installed.
  */
 
 async function floor(seed: string, options: { instruments?: string[]; maxTicks?: number } = {}) {
@@ -52,6 +55,26 @@ describe('the floor as a service', () => {
     const { snapshot } = floorSnapshot(id);
     expect(snapshot.messages.length).toBeGreaterThan(1);
     expect(snapshot.verification.ok).toBe(true);
+  });
+
+  it('hands over a recording that stands on its own', async () => {
+    const { id } = await floor('take-the-tape', { instruments: ['coffee-green'], maxTicks: 3 });
+    await runFloor(id);
+    await closeFloor(id);
+
+    const response = await GET(new Request(`http://localhost/api/floor/${id}/tape`), { params: Promise.resolve({ id }) });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-disposition')).toContain(`${id}.tape.json`);
+    const recording = (await response.json()) as SessionSnapshot;
+
+    // Checked with nothing but the file: the keyring is the public keys the tape carries itself, and
+    // the trial balance is re-added from the postings rather than read off the summary it prints.
+    const keyring = keyringFrom(recording.messages.map((message) => identityFromPublicKeyHex(message.actor, message.key)));
+    expect(verifyChain(recording.messages, keyring).ok).toBe(true);
+    const side = (pick: 'debit' | 'credit') =>
+      recording.entries.reduce((total, entry) => total + entry.postings.reduce((sum, posting) => sum + posting[pick], 0), 0);
+    expect(side('debit')).toBe(side('credit'));
+    expect(recording.headHash).toBe(computeSealHash(recording.messages[recording.messages.length - 1]!));
   });
 
   it('answers an unknown room with a 404', () => {

@@ -240,7 +240,7 @@ export interface TradeAction {
 }
 
 /**
- * The four things a person on the floor can do, each of them signed by the human's own key.
+ * What a person on the floor can do to a settlement, each of it signed by the human's own key.
  */
 export async function actOnFloorTrade(id: string, action: TradeAction): Promise<TradeRecord> {
   const room = mustFind(id);
