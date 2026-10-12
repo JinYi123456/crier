@@ -21,6 +21,7 @@
   --color-sell: #e2683f;
   --color-flag: #c9a227;
   --color-alarm: #d44a3e;
+  --color-good: #3fbf9a;
 
   --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
   --font-mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
@@ -161,4 +162,67 @@ body {
 
 ::selection {
   background: rgba(217, 164, 65, 0.35);
+}
+
+/* The scrubber: a brass line with a bell on it, not a browser default slider. */
+.scrubber {
+  appearance: none;
+  height: 22px;
+  background: transparent;
+  cursor: ew-resize;
+}
+
+.scrubber::-webkit-slider-runnable-track {
+  height: 2px;
+  background: rgba(217, 164, 65, 0.35);
+}
+
+.scrubber::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--color-brass);
+  box-shadow: 0 0 0 4px rgba(217, 164, 65, 0.18);
+}
+
+.scrubber::-moz-range-track {
+  height: 2px;
+  background: rgba(217, 164, 65, 0.35);
+}
+
+.scrubber::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-brass);
+}
+
+/* How a cell of the journal is dressed. */
+.journal-number {
+  text-align: right;
+}
+
+.journal-account {
+  color: rgba(240, 235, 225, 0.86);
+}
+
+.journal-party {
+  color: rgba(217, 164, 65, 0.75);
+}
+
+.journal-memo {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/*
+ * The journal grid, kept on the room's own type rather than the library's.
+ *
+ * Only plain properties belong here: AG Grid reads any `--ag-*` custom property on its own root as
+ * proof that a legacy theme stylesheet is loaded, and complains that it is being themed twice.
+ */
+.ag-root-wrapper {
+  font-family: var(--font-mono);
 }

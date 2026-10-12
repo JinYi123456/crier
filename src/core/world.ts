@@ -19,7 +19,16 @@ import {
 } from './policy';
 import { SimGateway } from '../gateway/sim';
 import type { GatewayEvent, GatewayMode, PaymentGateway } from '../gateway/types';
-import { Settler, type SettlerSummary, type TradeRecord } from './settlement';
+import {
+  Settler,
+  AUTO_SETTLE_LIMIT_MINOR,
+  FIRST_PAIRING_REVIEW_MINOR,
+  MIN_REPUTATION_BPS,
+  SESSION_EXPOSURE_CAP_MINOR,
+  STRAY_PRICE_BPS,
+  type SettlerSummary,
+  type TradeRecord,
+} from './settlement';
 
 /**
  * One session on the floor.
@@ -205,6 +214,21 @@ export interface SessionSnapshot {
   readonly summary: SettlerSummary;
   readonly verification: VerificationResult;
   readonly headHash: string;
+  /**
+   * The lines this floor holds itself to, as numbers rather than prose.
+   *
+   * A screen says them out loud in the room's own currency; the sealed record keeps amounts as
+   * integers so a re-verification never depends on whose locale formatted it.
+   */
+  readonly policy: {
+    readonly autoSettleLimitMinor: number;
+    readonly strayPriceBps: number;
+    readonly minReputationBps: number;
+    readonly sessionExposureCapMinor: number;
+    readonly firstPairingReviewMinor: number;
+    readonly feeBps: number;
+    readonly feeFixedMinor: number;
+  };
 }
 
 interface Market {
@@ -756,6 +780,15 @@ export class Session {
       summary: this.settler.summary(),
       verification: verifyChain(this.chain.messages, this.keyring),
       headHash: this.chain.headHash,
+      policy: {
+        autoSettleLimitMinor: AUTO_SETTLE_LIMIT_MINOR,
+        strayPriceBps: STRAY_PRICE_BPS,
+        minReputationBps: MIN_REPUTATION_BPS,
+        sessionExposureCapMinor: SESSION_EXPOSURE_CAP_MINOR,
+        firstPairingReviewMinor: FIRST_PAIRING_REVIEW_MINOR,
+        feeBps: (this.config.feeSchedule ?? DEFAULT_FEE_SCHEDULE).bps,
+        feeFixedMinor: (this.config.feeSchedule ?? DEFAULT_FEE_SCHEDULE).fixedMinor,
+      },
     };
   }
 

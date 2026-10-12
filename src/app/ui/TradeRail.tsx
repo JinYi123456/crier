@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { SerializedTrade } from '../../core/world';
-import type { CurrencyCode } from '../../core/money';
+import { fromDecimalString, type CurrencyCode } from '../../core/money';
 import { cash, clockOf } from './format';
 import type { TradeActionKind } from './ChitStack';
 
@@ -37,6 +37,16 @@ export default function TradeRail({
 }): React.ReactElement {
   const [open, setOpen] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
+  // A person types what they would say out loud; the engine only ever counts minor units.
+  const amountMinor = (() => {
+    const text = amount.trim();
+    if (text.length === 0) return undefined;
+    try {
+      return fromDecimalString(currency, text).minor;
+    } catch {
+      return undefined;
+    }
+  })();
 
   if (trades.length === 0) {
     return (
@@ -124,14 +134,15 @@ export default function TradeRail({
                       <input
                         value={amount}
                         onChange={(event) => setAmount(event.target.value)}
-                        placeholder={String(trade.grossMinor - trade.refundedMinor)}
+                        placeholder={cash(trade.grossMinor - trade.refundedMinor, currency)}
+                        inputMode="decimal"
                         className="w-28 rounded border border-white/15 bg-ink px-2 py-1 font-mono text-[11px] text-paper outline-none focus:border-brass/60"
-                        aria-label="amount to refund, in minor units"
+                        aria-label="how much to give the buyer back"
                       />
                       <button
                         type="button"
-                        disabled={busy}
-                        onClick={() => void onAction('partial_refund', trade.id, 'short count', Number(amount) || undefined)}
+                        disabled={busy || amountMinor === undefined}
+                        onClick={() => void onAction('partial_refund', trade.id, 'short count', amountMinor)}
                         className="rounded border border-brass/50 px-2 py-1 font-mono text-[10.5px] uppercase tracking-[0.1em] text-brass hover:bg-brass/15 disabled:opacity-40"
                       >
                         refund that much

@@ -139,7 +139,9 @@ describe('settlement pipeline', () => {
     expect(record.held).toBe(true);
     expect(record.phase).toBe('funded');
     expect(record.vetoRules).toContain('size');
-    expect(record.vetoReasons.join(' ')).toMatch(/above the auto-settle line/);
+    expect(record.vetoReasons.join(' ')).toMatch(/settles more here than the floor lets through/);
+    // A reason is signed prose: it must never carry money that somebody's locale has formatted.
+    for (const reason of record.vetoReasons) expect(reason).not.toMatch(/[$¥€]\s?\d|\d,\d{3}/);
     // The money is recognised in escrow but nothing has been taken.
     expect(h.ledger.balanceOf(ACCOUNT.escrow)).toBe(2_700_00);
     expect(h.settler.held).toHaveLength(1);

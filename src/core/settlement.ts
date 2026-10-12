@@ -105,7 +105,7 @@ export const DEFAULT_VETO_RULES: readonly VetoRule[] = [
     hint: 'Large settlements are the ones nobody wants to explain later.',
     check: (context) =>
       context.grossMinor > AUTO_SETTLE_LIMIT_MINOR
-        ? `${context.grossMinor} minor units on ${context.instrument} is above the auto-settle line of ${AUTO_SETTLE_LIMIT_MINOR}`
+        ? `${context.instrument} settles more here than the floor lets through on its own`
         : null,
   },
   {
@@ -116,7 +116,7 @@ export const DEFAULT_VETO_RULES: readonly VetoRule[] = [
       if (context.referencePriceMinor === null || context.referencePriceMinor <= 0) return null;
       const deviationBps = Math.round((Math.abs(context.priceMinor - context.referencePriceMinor) * 10_000) / context.referencePriceMinor);
       return deviationBps > STRAY_PRICE_BPS
-        ? `${context.priceMinor} sits ${deviationBps} bps from the last print at ${context.referencePriceMinor}`
+        ? `this fill on ${context.instrument} sits ${deviationBps} bps from the last print`
         : null;
     },
   },
@@ -135,7 +135,7 @@ export const DEFAULT_VETO_RULES: readonly VetoRule[] = [
     hint: 'Two strangers settling a real amount is the one worth reading; pocket change can go through.',
     check: (context) =>
       context.priorPairing === 0 && context.grossMinor > FIRST_PAIRING_REVIEW_MINOR
-        ? `${context.buyer} and ${context.seller} have never settled together and this is ${context.grossMinor} minor units`
+        ? `${context.buyer} and ${context.seller} have never settled together on this floor`
         : null,
   },
   {
@@ -144,7 +144,7 @@ export const DEFAULT_VETO_RULES: readonly VetoRule[] = [
     hint: 'Too much value flowing to one account in one session is a pattern, not a coincidence.',
     check: (context) =>
       context.sellerExposureMinor + context.grossMinor > SESSION_EXPOSURE_CAP_MINOR
-        ? `${context.seller} would pass ${SESSION_EXPOSURE_CAP_MINOR} minor units of session exposure`
+        ? `${context.seller} would take more of this session than one account should`
         : null,
   },
 ];
@@ -429,7 +429,7 @@ export class Settler {
       currency: input.currency,
     });
     trade.entries.push(deposit);
-    this.step(trade, 'funded', `order ${order.reference} created, ${gross} held in escrow`);
+    this.step(trade, 'funded', `order ${order.reference} created and the buyer's money held in escrow`);
     this.say(trade, 'order.created', {
       orderId: order.reference,
       grossMinor: gross,
@@ -545,7 +545,7 @@ export class Settler {
     const captureEntries = this.deps.ledger.listEntries().slice(before);
     trade.entries.push(...captureEntries);
 
-    this.step(trade, 'captured', `captured ${captured.gross.amountMinor}; ${netMinor} payable to ${trade.seller}, ${feeMinor} earned as fee`);
+    this.step(trade, 'captured', `captured against ${captured.reference}; the fee is booked and the seller is owed the net`);
     this.say(trade, 'order.captured', {
       orderId: captured.reference,
       captureId: captured.captureReference ?? '',
@@ -641,8 +641,8 @@ export class Settler {
       trade,
       'paid_out',
       record && trade.netMinor > 0
-        ? `paid ${trade.netMinor} to ${trade.seller} via ${record.reference}, ${trade.feeMinor} fee swept to the settlement bank`
-        : `fee ${trade.feeMinor} swept - nothing left to pay the seller`,
+        ? `paid ${trade.seller} via ${record.reference}, the fee swept to the settlement bank`
+        : `the fee swept to the settlement bank - nothing left to pay the seller`,
     );
     if (record) {
       this.say(trade, 'payout.paid', { payoutId: record.reference, recipient: trade.seller, amountMinor: record.amount.amountMinor, status: record.status });
@@ -707,11 +707,11 @@ export class Settler {
     }
 
     const at = this.deps.now();
-    if (trade.refundedMinor === trade.grossMinor) this.step(trade, 'refunded', `refunded ${amountMinor} to ${trade.buyer}: ${reason}`);
+    if (trade.refundedMinor === trade.grossMinor) this.step(trade, 'refunded', `refund sent to ${trade.buyer}: ${reason}`);
     else {
       trade.phase = paidOut ? 'paid_out' : 'captured';
       trade.updatedAt = at;
-      trade.steps.push({ phase: trade.phase, at, note: `part-refunded ${amountMinor} to ${trade.buyer}: ${reason}` });
+      trade.steps.push({ phase: trade.phase, at, note: `part-refund sent to ${trade.buyer}: ${reason}` });
     }
     this.say(trade, 'payment.refunded', {
       refundId: record.reference,

@@ -13,6 +13,7 @@ import TradeRail from './TradeRail';
 import { cash, shortKey } from './format';
 import { floorSound, thump } from './sound';
 import type { InstrumentCard } from './instruments';
+import type { Envelope } from './envelope';
 
 /**
  * The room.
@@ -21,11 +22,6 @@ import type { InstrumentCard } from './instruments';
  * of its own: a round is asked for, the answer is drawn, and the sound of the room follows what the
  * houses actually did rather than playing a loop.
  */
-
-interface Envelope {
-  readonly snapshot: SessionSnapshot;
-  readonly sinceSeq: number;
-}
 
 export default function Pit({
   id,
@@ -319,7 +315,7 @@ export default function Pit({
         </div>
 
         <div className="space-y-4">
-          <ChitStack trades={held} currency={currency} onAction={decide} busy={busy} />
+          <ChitStack trades={held} currency={currency} policy={snapshot.policy} onAction={decide} busy={busy} />
           <TradeRail trades={trades} currency={currency} onAction={decide} busy={busy} />
         </div>
       </div>

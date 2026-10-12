@@ -30,6 +30,12 @@ interface Opened {
   floor: string;
 }
 
+interface TradeRow {
+  id: string;
+  held: boolean;
+  phase: string;
+}
+
 const problems: string[] = [];
 
 function watch(page: import('@playwright/test').Page, label: string): void {
@@ -70,6 +76,11 @@ async function main(): Promise<number> {
       await api(`/api/floor/${floor}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'step' }) });
     }
 
+    const room = await api<{ snapshot: { trades: TradeRow[] } }>(`/api/floor/${floor}`);
+    const booked = room.snapshot.trades;
+    const trade = booked.find((row) => row.held) ?? booked[0];
+    console.log(`${booked.length} trade(s) booked, ${booked.filter((row) => row.held).length} held; photographing ${trade?.id ?? 'none'}`);
+
     const context = await browser.newContext({ viewport: { width: sizes[0]!.width, height: sizes[0]!.height }, deviceScaleFactor: 1 });
     const page = await context.newPage();
     watch(page, 'page');
@@ -87,6 +98,43 @@ async function main(): Promise<number> {
     await page.waitForTimeout(300);
     await shot(page, 'pit-inspector');
 
+    // The audit room: the grid has to actually paint rows, not just mount.
+    await page.goto(`${base}/audit?floor=${floor}`, { waitUntil: 'networkidle' });
+    await page.waitForSelector('[role="row"]', { timeout: 15_000 }).catch(() => problems.push('audit: the journal grid never painted a row'));
+    await page.waitForTimeout(600);
+    const cells = await page.locator('[role="gridcell"]').count();
+    if (cells === 0) problems.push('audit: no grid cells after the row selector resolved');
+    console.log(`audit room: ${cells} grid cells`);
+    await shot(page, 'audit-wide');
+
+    const scrubber = page.locator('input.scrubber');
+    if ((await scrubber.count()) === 1) {
+      await scrubber.first().evaluate((node) => {
+        const input = node as HTMLInputElement;
+        const half = Math.floor((Number(input.min) + Number(input.max)) / 2);
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+        setter?.call(input, String(half));
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      await page.waitForTimeout(400);
+      await shot(page, 'audit-halfway');
+    } else {
+      problems.push('audit: no scrubber on the page');
+    }
+
+    await page.goto(`${base}/docs`, { waitUntil: 'networkidle' });
+    await shot(page, 'docs-wide');
+
+    // The two URLs the processor sends a buyer back to, plus one that names nothing.
+    if (trade !== undefined) {
+      await page.goto(`${base}/checkout/return?trade=${encodeURIComponent(trade.id)}`, { waitUntil: 'networkidle' });
+      await shot(page, `checkout-return-${trade.phase}`);
+      await page.goto(`${base}/checkout/cancel?trade=${encodeURIComponent(trade.id)}`, { waitUntil: 'networkidle' });
+      await shot(page, 'checkout-cancel');
+    }
+    await page.goto(`${base}/checkout/return`, { waitUntil: 'networkidle' });
+    await shot(page, 'checkout-no-trade');
+
     for (const size of sizes.slice(1)) {
       await page.setViewportSize({ width: size.width, height: size.height });
       await page.goto(`${base}/`, { waitUntil: 'networkidle' });
@@ -94,6 +142,15 @@ async function main(): Promise<number> {
       await page.goto(`${base}/floor/${floor}`, { waitUntil: 'networkidle' });
       await page.waitForTimeout(400);
       await shot(page, `pit-${size.name}`);
+      await page.goto(`${base}/docs`, { waitUntil: 'networkidle' });
+      await shot(page, `docs-${size.name}`);
+      await page.goto(`${base}/audit?floor=${floor}`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(700);
+      await shot(page, `audit-${size.name}`);
+      if (trade !== undefined) {
+        await page.goto(`${base}/checkout/return?trade=${encodeURIComponent(trade.id)}`, { waitUntil: 'networkidle' });
+        await shot(page, `checkout-return-${size.name}`);
+      }
     }
 
     await context.close();

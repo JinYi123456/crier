@@ -341,6 +341,47 @@ export function floorOf(id: string): Session {
   return mustFind(id).session;
 }
 
+export interface TradeLocation {
+  readonly floorId: string;
+  readonly trade: TradeRecord;
+}
+
+/**
+ * Find a settlement from its own id, without being told which room it happened in.
+ *
+ * A buyer comes back from the processor with a URL that carries the trade and nothing else - they
+ * never saw the room id. When no floor answers, the honest report is that this machine has no such
+ * settlement, rather than a page that guesses at what happened to the money.
+ */
+export function findTrade(tradeId: string): TradeLocation | null {
+  for (const [floorId, room] of store().rooms) {
+    const trade = room.session.settler.get(tradeId);
+    if (trade) {
+      room.lastSeen = Date.now();
+      return { floorId, trade };
+    }
+  }
+  return null;
+}
+
+/**
+ * Whether the processor still holds an order open for its buyer, asked without moving anything.
+ *
+ * `approveOrder` is how the floor drives a capture, so a page a buyer's browser loads cannot use it:
+ * the local processor approves on request, and a GET would settle money nobody signed for. The
+ * processor's queue is the read-only half of the same truth - once an order has left it, the buyer
+ * has approved, and the decision to capture goes back on the pile where a person makes it.
+ */
+export async function orderAwaitingBuyer(floorId: string, reference: string): Promise<boolean | null> {
+  const room = mustFind(floorId);
+  try {
+    const waiting = await room.session.gateway.listWaiting();
+    return waiting.some((order) => order.reference === reference);
+  } catch {
+    return null;
+  }
+}
+
 /** A fresh, unguessable seed for somebody who just wants to see a floor run. */
 export function suggestedSeed(): string {
   return randomUUID().slice(0, 8);

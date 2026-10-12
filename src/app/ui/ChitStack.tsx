@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { SerializedTrade } from '../../core/world';
+import type { SessionSnapshot, SerializedTrade } from '../../core/world';
 import type { CurrencyCode } from '../../core/money';
 import { cash, clockOf } from './format';
 import { thump } from './sound';
@@ -9,20 +9,45 @@ import { thump } from './sound';
  *
  * A chit is a settlement that will not move until somebody reads it and decides. The rule that
  * caught it is printed on the chit in plain words, because "held by rule concentration" is not a
- * decision - "this seller is carrying 40% of the session" is. Refusing takes the money back out of
- * escrow and says why on the tape; letting it through captures and pays the seller.
+ * decision - "this seller is carrying more of the session than one account should" is. Refusing
+ * takes the money back out of escrow and says why on the tape; letting it through captures and pays
+ * the seller.
  */
 
 export type TradeActionKind = 'release' | 'veto' | 'refund' | 'partial_refund' | 'payout';
 
+type Policy = SessionSnapshot['policy'];
+
+/** What the rule actually says, with the floor's own numbers in it. */
+function ruleLine(ruleId: string, policy: Policy, currency: CurrencyCode): string {
+  switch (ruleId) {
+    case 'size':
+      return `the auto-settle line is ${cash(policy.autoSettleLimitMinor, currency)} a ticket`;
+    case 'stray_price':
+      return `a fill more than ${(policy.strayPriceBps / 100).toFixed(1)}% away from the last print`;
+    case 'unrated':
+      return `one side stands under ${policy.minReputationBps} bps of standing in the pit`;
+    case 'first_pairing':
+      return `two strangers settling over ${cash(policy.firstPairingReviewMinor, currency)} for the first time`;
+    case 'concentration':
+      return `one account taking more than ${cash(policy.sessionExposureCapMinor, currency)} in a session`;
+    case 'awaiting_approval':
+      return `the processor is still holding this order for its buyer`;
+    default:
+      return '';
+  }
+}
+
 export default function ChitStack({
   trades,
   currency,
+  policy,
   onAction,
   busy,
 }: {
   trades: readonly SerializedTrade[];
   currency: CurrencyCode;
+  policy: Policy;
   onAction: (action: TradeActionKind, tradeId: string, note?: string, amountMinor?: number) => Promise<string | null>;
   busy: boolean;
 }): React.ReactElement {
@@ -81,6 +106,10 @@ export default function ChitStack({
                     <li key={`${trade.id}-${position}`} className="text-[12px] leading-snug text-[#3a3226]">
                       <span className="mr-1 font-mono text-[10px] uppercase tracking-wide text-[#a84d24]">{trade.vetoRules[position] ?? 'rule'}</span>
                       {reason}
+                      {(() => {
+                        const line = ruleLine(trade.vetoRules[position] ?? '', policy, currency);
+                        return line.length > 0 ? <span className="mt-0.5 block font-mono text-[10.5px] text-[#7a6a4f]">{line}</span> : null;
+                      })()}
                     </li>
                   ))
                 )}
