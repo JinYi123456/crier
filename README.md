@@ -164,7 +164,10 @@ the bell until a settlement stops on the human pile, has the crier read that car
 reason, and then asks the audit room whether the books still agree - and it reaches every one of those
 rooms through its pointer URL, so the machine painting the page may be one that never saw the floor
 opened. It is kept out of `verify` on purpose: a browser test pointed at a server that is not running
-proves nothing, and `verify` is the one command that never needs anything from the outside world.
+proves nothing, and `verify` is the one command that never needs anything from the outside world. It is
+three tests, and they are written to hold on either kind of machine - the one that was handed PayPal
+credentials opens a floor on the real processor, the one that was not says so in as many words, and the
+test accepts whichever happens and prints it. Both branches were walked against both machines.
 
 The language audit is not a joke lint. Everything shipped has to be English, and the check walks
 every source file for prose in another script and for sentences that belong in a private note

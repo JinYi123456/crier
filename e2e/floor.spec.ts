@@ -129,3 +129,27 @@ test('the address alone brings up the room: the screen names the same seals as t
   await expect(page.getByText('4/10', { exact: true })).toBeVisible({ timeout: 30_000 });
   expect(await lines.textContent()).toBe(first);
 });
+
+test('asked for the real processor, the front door either has permission or says it has none', async ({ page }) => {
+  // Which of the two happens is a property of the machine, not of the app: a laptop that was handed
+  // PayPal credentials settles on the real one, a deployment that was not refuses in as many words.
+  // What neither may do is go quiet, or open a floor that pretends.
+  await page.goto('/');
+  await page.getByText('settle on the real processor').click();
+  await page.getByRole('button', { name: /Take the floor/ }).click();
+
+  const refusal = page.getByText(/PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET/);
+  const settled = page.getByText('sandbox', { exact: true });
+  const outcome = await Promise.race([
+    refusal.waitFor({ timeout: 60_000 }).then(() => 'refused' as const),
+    page.waitForURL(/\/floor\//, { timeout: 60_000 }).then(() => 'opened' as const),
+  ]);
+  console.log(`the front door answered a request for the real processor by ${outcome}`);
+
+  if (outcome === 'refused') {
+    await expect(refusal).toBeVisible();
+    expect(page.url()).not.toMatch(/\/floor\//);
+    return;
+  }
+  await expect(settled.first()).toBeVisible({ timeout: 30_000 });
+});
