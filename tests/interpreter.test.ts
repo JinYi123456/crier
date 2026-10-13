@@ -30,6 +30,7 @@ function facts(over: Partial<HoldFacts> = {}): HoldFacts {
     gross: '4120.00 USD',
     fee: '41.20 USD',
     net: '4078.80 USD',
+    struck: true,
     currency: 'USD',
     phase: 'matched',
     lastPrint: '398.00 USD',
@@ -265,6 +266,30 @@ describe('the words themselves', () => {
     // A template that does not name both doors is not a brief, it is a nudge.
     expect(once).toContain('Letting it through');
     expect(once).toContain('refusing it');
+  });
+
+  it('keeps a reading that quotes a rule in basis points', async () => {
+    // A reputation rule speaks in bps, and the figure gate must not read `2177 bps` as an amount the
+    // model invented - that would throw away a true sentence because it was phrased in the rule's own
+    // units. Only something that looks like money is checked against the card.
+    const post = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: 'buy-halden-1-grn pays sell-larkspur-1-grn 4120.00 USD for saffron at 412.00 USD each. It is on the pile because one side stands at 2177 bps, under the 3000 bps this pit asks for. You may let it through, or refuse it.' } }] }),
+    });
+    vi.stubGlobal('fetch', post);
+    const voice = await readChit(facts(), { ...NO_MODEL, AI_BASE_URL: 'https://infer.example/v1', AI_API_KEY: 'a-key', AI_MODEL: 'model-x' });
+    expect(voice.source).toBe('endpoint');
+  });
+
+  it('does not read a split the floor has not struck yet', () => {
+    // Capture is what takes the fee, so on a chit that is asking to be captured the engine's fee and net
+    // are both still zero. Saying "0.00 USD" there would tell a person the floor takes nothing, which is
+    // a statement about a future the record has not written yet.
+    const early = templateBrief(facts({ struck: false, fee: '0.00 USD', net: '0.00 USD' }));
+    expect(early).toContain('has not yet split');
+    expect(early).not.toMatch(/(^|\s)0\.00 USD/);
+    expect(early).toContain('4120.00 USD');
+    expect(early).toContain('Letting it through');
   });
 
   it('quotes a rule the floor does not know without inventing a reason for it', () => {

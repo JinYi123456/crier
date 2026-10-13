@@ -142,7 +142,7 @@ src/gateway/    the payment boundary. types.ts is the contract; sim.ts and paypa
 src/server/     rooms, the interpreter that reads a chit to a person, and the mapping from a refusal to an HTTP status.
 src/app/        Next.js App Router: the screens and the JSON API.
 tools/          the terminal pit, the ledger auditor, the language audit, the screenshot walk.
-tests/          vitest, 180 tests over the engine, the gateway and the interpreter.
+tests/          vitest, 181 tests over the engine, the gateway and the interpreter.
 ```
 
 The engine is server-side only — it uses `node:crypto` and never runs in the browser. Client

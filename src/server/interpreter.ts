@@ -238,6 +238,8 @@ export interface HoldFacts {
   readonly gross: string;
   readonly fee: string;
   readonly net: string;
+  /** Whether the split between the fee and the seller's take has actually been struck yet. */
+  readonly struck: boolean;
   readonly currency: CurrencyCode;
   readonly phase: string;
   readonly lastPrint: string | null;
@@ -263,10 +265,16 @@ export function factsFor(snapshot: SessionSnapshot, trade: SerializedTrade): Hol
   const gross = spoken(trade.grossMinor, currency);
   const fee = spoken(trade.feeMinor, currency);
   const net = spoken(trade.netMinor, currency);
+  // Capture is what strikes the split, so on a chit that has not been captured the engine's fee and net
+  // are both legitimately zero. Saying "0.00 USD" on a card that is asking for a capture would read like
+  // the floor takes nothing, so the brief says plainly that the split has not been struck instead.
+  const struck = trade.netMinor > 0;
   const lastPrint = last === null ? null : spoken(last, currency);
   const lines = [
     `${trade.buyer} agreed to pay ${trade.seller} ${gross} for ${trade.qty} unit(s) of ${trade.instrument} at ${price} each.`,
-    `This floor books ${fee} as its fee and ${net} as the seller's take.`,
+    struck
+      ? `This floor books ${fee} as its fee and ${net} as the seller's take.`
+      : `The floor's fee and the seller's take are struck when the money is captured, and this money has not been captured yet.`,
     lastPrint === null ? '' : `The last print on ${trade.instrument} was ${lastPrint}.`,
     ...caughtBy.map((entry) => `Caught by ${entry.rule}: ${entry.reason}. ${entry.hint}`),
     `The settlement is currently ${trade.phase}.`,
@@ -282,6 +290,7 @@ export function factsFor(snapshot: SessionSnapshot, trade: SerializedTrade): Hol
     gross,
     fee,
     net,
+    struck,
     currency,
     phase: trade.phase,
     lastPrint,
@@ -344,7 +353,9 @@ export function templateBrief(facts: HoldFacts): string {
         : `${caught.map((entry) => entry.reason).join(', and ')}`;
   return polish(
     `${facts.buyer} agreed to pay ${facts.seller} ${facts.gross} for ${facts.qty} unit(s) of ${facts.instrument} at ${facts.price} each, ` +
-      `of which this floor keeps ${facts.fee} and ${facts.seller} takes ${facts.net}. ` +
+      (facts.struck
+        ? `of which this floor keeps ${facts.fee} and ${facts.seller} takes ${facts.net}. `
+        : `which this floor has not yet split - capturing it is what strikes its fee and the seller's take. `) +
       `It is on the pile because ${why}. ` +
       `The money sits at ${facts.phase}. ` +
       `Letting it through captures it and pays ${facts.seller}; refusing it sends ${facts.buyer} their money back and writes your reason on the tape.`,
@@ -368,7 +379,12 @@ export function templateBrief(facts: HoldFacts): string {
  * exactly, because those are digits and there is nothing to forgive. This is the whole discipline of
  * the channel in one predicate: the words may be generated, the numbers may not.
  */
-const AMOUNT = /\d+(?:\.\d+)?\s*[A-Za-z]{3}\b/g;
+/**
+ * An amount as this floor writes one: digits, a decimal point, two places, and a currency. A rule that
+ * quotes `2177 bps` is not an amount and must not be mistaken for one, so the two decimals are required
+ * rather than guessed at.
+ */
+const AMOUNT = /\d+\.\d{2}\s*[A-Za-z]{3}\b/g;
 
 function keepsFaith(text: string, facts: HoldFacts): boolean {
   const said = text.toLowerCase();
