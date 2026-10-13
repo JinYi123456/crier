@@ -23,9 +23,11 @@ export interface Seat {
 }
 
 const WIDTH = 620;
-const HEIGHT = 440;
+// The far arc's houses stand at the bottom of the ring with their name and their shout written under
+// them, so the frame has to be taller than the felt or the last row gets cut off at the edge.
+const HEIGHT = 470;
 const CX = WIDTH / 2;
-const CY = HEIGHT / 2 + 8;
+const CY = HEIGHT / 2 - 1;
 const RX = 262;
 const RY = 176;
 
@@ -62,12 +64,14 @@ export default function SeatRing({
   onSelect: (id: string) => void;
   lastPrintFlash: number;
 }): React.ReactElement {
-  const buyers = seats.filter((seat) => seat.role === 'buy' && !seat.withdrawn);
-  const sellers = seats.filter((seat) => seat.role === 'sell' && !seat.withdrawn);
-  const walked = seats.filter((seat) => seat.withdrawn);
+  // Every house holds its place on its side's arc whether it is still trading or not, so a seat going
+  // empty leaves a gap in the ring rather than sliding the whole room round to close it - and a walked
+  // house never lands on top of a house still shouting.
+  const buySide = seats.filter((seat) => seat.role === 'buy');
+  const sellSide = seats.filter((seat) => seat.role === 'sell');
   const placed = [
-    ...buyers.map((seat, index) => ({ seat, ...seatAt('buy', index, buyers.length) })),
-    ...sellers.map((seat, index) => ({ seat, ...seatAt('sell', index, sellers.length) })),
+    ...buySide.map((seat, index) => ({ seat, ...seatAt('buy', index, buySide.length) })),
+    ...sellSide.map((seat, index) => ({ seat, ...seatAt('sell', index, sellSide.length) })),
   ];
   const boardLeft = CX - 118;
   const boardRight = CX + 118;
@@ -78,11 +82,34 @@ export default function SeatRing({
 
   return (
     <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full select-none" role="img" aria-label="The trading pit, with houses seated around the clerk's board">
-      <ellipse cx={CX} cy={CY} rx={RX + 44} ry={RY + 34} fill="#0a0e12" stroke="rgba(217,164,65,0.16)" />
-      <ellipse cx={CX} cy={CY} rx={RX} ry={RY} fill="#111820" stroke="rgba(255,255,255,0.06)" className="pit-floor" />
+      <defs>
+        <radialGradient id="ring-felt" cx="50%" cy="44%" r="64%">
+          <stop offset="0%" stopColor="#1e2934" />
+          <stop offset="58%" stopColor="#111820" />
+          <stop offset="100%" stopColor="#080b0e" />
+        </radialGradient>
+        <linearGradient id="ring-slate" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#f6efe0" />
+          <stop offset="100%" stopColor="#ddd0b5" />
+        </linearGradient>
+        <linearGradient id="ring-wood" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#3a2718" />
+          <stop offset="55%" stopColor="#2a1d12" />
+          <stop offset="100%" stopColor="#1b120a" />
+        </linearGradient>
+        <linearGradient id="ring-brass" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#f0cd7c" />
+          <stop offset="46%" stopColor="#d9a441" />
+          <stop offset="100%" stopColor="#7d5a14" />
+        </linearGradient>
+      </defs>
+      <ellipse cx={CX} cy={CY} rx={RX + 44} ry={RY + 34} fill="url(#ring-felt)" />
+      <ellipse cx={CX} cy={CY} rx={RX - 78} ry={RY - 62} fill="none" stroke="rgba(241,231,212,0.07)" strokeDasharray="2 7" />
+      <ellipse cx={CX} cy={CY} rx={RX} ry={RY} fill="none" stroke="url(#ring-brass)" strokeWidth="1.6" opacity="0.42" />
+      <ellipse cx={CX} cy={CY} rx={RX + 5} ry={RY + 5} fill="none" stroke="rgba(217,164,65,0.14)" strokeWidth="3" strokeDasharray="7 9" />
 
       {/* The hands that are up on the board right now. */}
-      {placed.map(({ seat, x, y }) =>
+      {placed.filter(({ seat }) => !seat.withdrawn).map(({ seat, x, y }) =>
         seat.resting.slice(0, 2).map((order, index) => {
           const edge = seat.role === 'buy' ? boardLeft : boardRight;
           const ty = CY - 26 + index * 34 + (seat.role === 'buy' ? 0 : 6);
@@ -100,38 +127,58 @@ export default function SeatRing({
         }),
       )}
 
-      {/* The clerk's board, in the middle of the ring. */}
-      <g>
-        <rect x={boardLeft} y={CY - 52} width={236} height={104} rx={6} className={lastPrintFlash > 0 ? 'knock' : ''} fill="#f1e7d4" opacity="0.95" />
-        <rect x={boardLeft} y={CY - 52} width={236} height={20} rx={6} fill="#2a1d12" opacity="0.85" />
-        <text x={CX} y={CY - 38} textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="11" fill="#d9a441" letterSpacing="2">
+      {/* The clerk's board, in the middle of the ring: a board on a frame, with the two sides of the
+          market written on it in the same columns a clerk would jot them in. */}
+      <g className={lastPrintFlash > 0 ? 'knock' : ''}>
+        <rect x={boardLeft - 6} y={CY - 58} width={248} height={116} rx={10} fill="url(#ring-wood)" />
+        <rect x={boardLeft} y={CY - 52} width={236} height={104} rx={7} fill="url(#ring-slate)" />
+        <rect x={boardLeft} y={CY - 52} width={236} height={22} rx={7} fill="#2a1d12" />
+        <rect x={boardLeft} y={CY - 44} width={236} height={14} fill="#2a1d12" />
+        <text x={CX} y={CY - 36} textAnchor="middle" className="board-head" fontSize="10">
           {board.instrumentId.toUpperCase()} · CLERK BOARD
         </text>
-        <text x={boardLeft + 14} y={CY - 6} fontFamily="ui-monospace, monospace" fontSize="12" fill="#2f6f57">
+
+        <line x1={CX} y1={CY - 22} x2={CX} y2={CY + 30} stroke="#26201a" strokeOpacity="0.14" />
+        <text x={boardLeft + 16} y={CY - 8} className="board-side-buy" fontSize="10">
           BID
         </text>
-        <text x={boardLeft + 14} y={CY + 12} fontFamily="ui-monospace, monospace" fontSize="19" fill="#1d6a51" className="tnum">
+        <text x={boardLeft + 16} y={CY + 14} className="board-figure" fontSize="24">
           {bestBid === null ? '—' : cash(bestBid, currency)}
         </text>
-        <text x={boardLeft + 14} y={CY + 28} fontFamily="ui-monospace, monospace" fontSize="10" fill="#6b6152">
+        <text x={boardLeft + 16} y={CY + 30} className="board-foot" fontSize="9">
           {bestBid === null ? 'no bids resting' : `${bestBidQty} for the best`}
         </text>
-        <text x={boardRight - 14} y={CY - 6} textAnchor="end" fontFamily="ui-monospace, monospace" fontSize="12" fill="#9a4a28">
+        <text x={boardRight - 16} y={CY - 8} textAnchor="end" className="board-side-sell" fontSize="10">
           OFFER
         </text>
-        <text x={boardRight - 14} y={CY + 12} textAnchor="end" fontFamily="ui-monospace, monospace" fontSize="19" fill="#a84d24" className="tnum">
+        <text x={boardRight - 16} y={CY + 14} textAnchor="end" className="board-figure" fontSize="24">
           {bestAsk === null ? '—' : cash(bestAsk, currency)}
         </text>
-        <text x={boardRight - 14} y={CY + 28} textAnchor="end" fontFamily="ui-monospace, monospace" fontSize="10" fill="#6b6152">
+        <text x={boardRight - 16} y={CY + 30} textAnchor="end" className="board-foot" fontSize="9">
           {bestAsk === null ? 'no offers resting' : `${bestAskQty} for the best`}
         </text>
-        <text x={CX} y={CY + 44} textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="11" fill="#4a4238">
+        <text x={CX} y={CY + 46} textAnchor="middle" className="board-foot" fontSize="9">
           {board.lastPrintMinor === null ? 'no print yet' : `last ${cash(board.lastPrintMinor, currency)}`} · open {cash(board.openingMinor, currency)}
         </text>
       </g>
 
       {placed.map(({ seat, x, y }) => {
         const color = seat.role === 'buy' ? '#3fbf9a' : '#e2683f';
+        if (seat.withdrawn) {
+          // An empty seat stays a seat: the ring keeps the shape it was opened with, and the gap is
+          // part of the record of the session rather than something to tidy away.
+          return (
+            <g key={seat.id} transform={`translate(${x} ${y})`} opacity="0.45">
+              <circle r={13} fill="none" stroke="#6b7280" strokeDasharray="3 3" />
+              <text y={4} textAnchor="middle" className="seat-number" fontSize="11" fill="#6b7280">
+                {initials(seat.name)}
+              </text>
+              <text y={30} textAnchor="middle" className="ring-name" fontSize="11" fill="#6b7280">
+                {seat.name} walked
+              </text>
+            </g>
+          );
+        }
         const heat = Math.min(1, seat.pressure);
         const halo = 20 + heat * 15;
         const selected = selectedId === seat.id;
@@ -151,7 +198,7 @@ export default function SeatRing({
               className={heat > 0.55 ? 'halo-breathe' : ''}
             />
             <circle r={17} fill="#0d1216" stroke={selected ? '#d9a441' : color} strokeWidth={selected ? 2.4 : 1.3} />
-            <text y={4} textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="11" fill={color}>
+            <text y={4} textAnchor="middle" className="seat-number" fontSize="12" fill={color}>
               {initials(seat.name)}
             </text>
             {/* The hand's remaining capacity: cash for a buyer, stock for a seller. */}
@@ -164,29 +211,14 @@ export default function SeatRing({
               strokeDasharray={`${remainingFraction * 2 * Math.PI * 21} ${2 * Math.PI * 21}`}
               transform="rotate(-90)"
             />
-            <text y={34} textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="9.5" fill="rgba(255,255,255,0.5)">
+            <text y={34} textAnchor="middle" className="ring-name">
               {seat.name}
             </text>
             {seat.resting.length > 0 && (
-              <text y={46} textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="9" fill={color} opacity="0.8">
+              <text y={46} textAnchor="middle" className="ring-quote" fill={color}>
                 {seat.role === 'buy' ? 'bidding' : 'offering'} {cash(seat.resting[0]!.priceMinor, currency)}
               </text>
             )}
-          </g>
-        );
-      })}
-
-      {walked.map((seat, index) => {
-        const { x, y } = seatAt(seat.role, index, Math.max(1, walked.length), 1.18);
-        return (
-          <g key={seat.id} transform={`translate(${x} ${y})`} opacity="0.4">
-            <circle r={13} fill="none" stroke="#6b7280" strokeDasharray="3 3" />
-            <text y={4} textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="10" fill="#6b7280">
-              {initials(seat.name)}
-            </text>
-            <text y={28} textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="9" fill="#6b7280">
-              walked
-            </text>
           </g>
         );
       })}

@@ -1,7 +1,7 @@
 import { INSTRUMENTS } from '../core/catalog';
 import { listFloors } from '../server/floor';
 import { floorHref } from './ui/pointer';
-import OpenFloorForm from './ui/OpenFloorForm';
+import FrontDoor from './ui/FrontDoor';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,35 +17,14 @@ export default function Home(): React.ReactElement {
 
   return (
     <div className="pt-10">
-      <div className="grid gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-        <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-brass/80">Commodities, crafts, small goods</p>
-          <h1 className="mt-3 font-display text-[42px] leading-[1.05] text-paper sm:text-[54px]">
-            The pit where agents bid,
-            <br />
-            and a human holds the bell.
-          </h1>
-          <p className="mt-5 max-w-[62ch] text-[15px] leading-relaxed text-white/65">
-            Crier seats a handful of autonomous houses around an open-outcry market. They shout bids and offers, a matching
-            engine prints them, every print becomes a trade that escrows real money on a double-entry ledger, and each word is
-            signed by the house that said it and sealed into a chain. Anything that looks wrong stops on a pile in front of a
-            person, who decides whether it settles.
-          </p>
-
-          <div className="mt-7">
-            <OpenFloorForm
-              instruments={INSTRUMENTS.map((instrument) => ({
-                id: instrument.id,
-                name: instrument.name,
-                symbol: instrument.symbol,
-                lot: instrument.lot,
-              }))}
-            />
-          </div>
-        </div>
-
-        <PitPlan />
-      </div>
+      <FrontDoor
+        instruments={INSTRUMENTS.map((instrument) => ({
+          id: instrument.id,
+          name: instrument.name,
+          symbol: instrument.symbol,
+          lot: instrument.lot,
+        }))}
+      />
 
       {floors.length > 0 ? (
         <section className="mt-12">
@@ -101,59 +80,5 @@ function Column({ kicker, body }: { kicker: string; body: string }): React.React
       <h3 className="font-display text-[17px] text-brass">{kicker}</h3>
       <p className="mt-2 text-[13.5px] leading-relaxed text-white/60">{body}</p>
     </article>
-  );
-}
-
-/**
- * The plan of the pit, drawn rather than described.
- *
- * Two arcs of seats around a clerk's board, and a bell at the top. Nothing here is data - it is the
- * shape of the room you are about to walk into.
- */
-function PitPlan(): React.ReactElement {
-  const buyers = [0, 1, 2, 3, 4];
-  const sellers = [0, 1, 2, 3, 4];
-  return (
-    <svg viewBox="0 0 460 380" role="img" aria-label="The plan of a trading pit: two arcs of seats around a clerk's board" className="w-full">
-      <defs>
-        <radialGradient id="felt" cx="50%" cy="46%" r="62%">
-          <stop offset="0%" stopColor="#1c2630" />
-          <stop offset="70%" stopColor="#0d1217" />
-          <stop offset="100%" stopColor="#080a0d" />
-        </radialGradient>
-      </defs>
-      <ellipse cx="230" cy="205" rx="200" ry="150" fill="url(#felt)" stroke="rgba(217,164,65,0.32)" strokeWidth="1.5" />
-      <ellipse cx="230" cy="205" rx="140" ry="100" fill="none" stroke="rgba(255,255,255,0.07)" />
-      <g className="bell-live" style={{ transformOrigin: '230px 46px' }}>
-        <path d="M230 34 v10" stroke="#d9a441" strokeWidth="2" />
-        <path d="M216 58 q14 -22 28 0 z" fill="#d9a441" opacity="0.9" />
-        <circle cx="230" cy="60" r="3" fill="#8a6519" />
-      </g>
-      {buyers.map((index) => {
-        const angle = (-58 + index * 29) * (Math.PI / 180);
-        const x = 230 + Math.sin(angle) * 176;
-        const y = 205 - Math.cos(angle) * 130;
-        return <circle key={`b${index}`} cx={x} cy={y} r="9" fill="#3fbf9a" opacity="0.75" />;
-      })}
-      {sellers.map((index) => {
-        const angle = (122 + index * 29) * (Math.PI / 180);
-        const x = 230 + Math.sin(angle) * 176;
-        const y = 205 - Math.cos(angle) * 130;
-        return <circle key={`s${index}`} cx={x} cy={y} r="9" fill="#e2683f" opacity="0.75" />;
-      })}
-      <rect x="188" y="182" width="84" height="46" rx="4" fill="#f1e7d4" opacity="0.92" />
-      <text x="230" y="202" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="10" fill="#26201a">
-        CLERK
-      </text>
-      <text x="230" y="216" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="10" fill="#26201a">
-        BOARD
-      </text>
-      <text x="70" y="118" fontFamily="ui-monospace, monospace" fontSize="10" fill="#3fbf9a">
-        BUYERS
-      </text>
-      <text x="330" y="296" fontFamily="ui-monospace, monospace" fontSize="10" fill="#e2683f">
-        SELLERS
-      </text>
-    </svg>
   );
 }

@@ -149,9 +149,95 @@ body {
   .knock,
   .bell-live,
   .tape-in,
-  .halo-breathe {
+  .halo-breathe,
+  .plan-seat,
+  .plan-board {
     animation: none;
   }
+}
+
+/* The plan on the front door and the pit share one lettering: a board is a board wherever it hangs. */
+.pit-arc {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  fill: rgba(241, 231, 212, 0.3);
+}
+
+.board-head {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.2em;
+  fill: var(--color-brass);
+}
+
+.board-side-buy {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  fill: #2f6f57;
+}
+
+.board-side-sell {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  fill: #9a4a28;
+}
+
+.board-figure {
+  font-family: var(--font-display);
+  font-size: 21px;
+  fill: #26201a;
+}
+
+.board-foot {
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.08em;
+  fill: #6b6152;
+}
+
+.seat-number {
+  font-family: var(--font-display);
+  font-size: 11px;
+}
+
+/* A house's name is the one thing on the ring a person reads, so it is not set in monospace. */
+.ring-name {
+  font-family: var(--font-display);
+  font-size: 12px;
+  fill: rgba(241, 231, 212, 0.62);
+}
+
+.ring-quote {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+/* A seat being taken. The transform has to be scaled about the seat itself, not the drawing. */
+@keyframes seat-taken {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.plan-seat {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: seat-taken 420ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+.plan-board {
+  animation: print-knock 340ms ease-out;
 }
 
 /* Numbers on a trading floor are tabular or they are lies. */

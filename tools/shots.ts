@@ -70,15 +70,19 @@ async function main(): Promise<number> {
     const { floor } = await api<Opened>('/api/floor', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ seed: `shots-${Date.now() % 100000}`, instruments: ['coffee-green', 'cacao-fine'], agentsPerSide: 4, maxTicks: 10 }),
+      body: JSON.stringify({ seed: 'gallery', instruments: ['coffee-green', 'cacao-fine'], agentsPerSide: 4, maxTicks: 12 }),
     });
 
-    for (let round = 0; round < 6; round += 1) {
+    // Ring until the pile has something on it. A gallery shot of an empty pile photographs a product
+    // that is not working, and how many rounds it takes before a settlement stops depends on the seed.
+    let booked: TradeRow[] = [];
+    for (let round = 0; round < 10; round += 1) {
       await api(`/api/floor/${floor}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'step' }) });
+      const room = await api<{ snapshot: { trades: TradeRow[] } }>(`/api/floor/${floor}`);
+      booked = room.snapshot.trades;
+      if (booked.some((row) => row.held)) break;
     }
 
-    const room = await api<{ snapshot: { trades: TradeRow[] } }>(`/api/floor/${floor}`);
-    const booked = room.snapshot.trades;
     const trade = booked.find((row) => row.held) ?? booked[0];
     console.log(`${booked.length} trade(s) booked, ${booked.filter((row) => row.held).length} held; photographing ${trade?.id ?? 'none'}`);
 
