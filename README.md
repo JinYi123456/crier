@@ -143,6 +143,7 @@ src/server/     rooms, the interpreter that reads a chit to a person, and the ma
 src/app/        Next.js App Router: the screens and the JSON API.
 tools/          the terminal pit, the ledger auditor, the language audit, the screenshot walk.
 tests/          vitest, 181 tests over the engine, the gateway and the interpreter.
+e2e/            Playwright, one shift at the desk: it rings the bell in a browser and clicks the pile.
 ```
 
 The engine is server-side only — it uses `node:crypto` and never runs in the browser. Client
@@ -155,7 +156,15 @@ npm run verify
 ```
 
 That is typecheck, the test suite, the language audit and a production build, in that order.
-`npm run test:e2e` adds the Playwright pass over the live screens.
+
+`npm run test:e2e` is the Playwright pass over the live screens, and it needs a running app to point
+at: start `npm run dev` and it takes `http://127.0.0.1:3000`, or name another one with
+`E2E_BASE_URL=http://127.0.0.1:3222 npm run test:e2e`. It walks a floor the way a visitor does - rings
+the bell until a settlement stops on the human pile, has the crier read that card, refuses it with a
+reason, and then asks the audit room whether the books still agree - and it reaches every one of those
+rooms through its pointer URL, so the machine painting the page may be one that never saw the floor
+opened. It is kept out of `verify` because a browser test against a server that is not up is a lie
+either way.
 
 The language audit is not a joke lint. Everything shipped has to be English, and the check walks
 every source file for prose in another script and for sentences that belong in a private note
