@@ -1,0 +1,17 @@
+# Nothing in here is part of the app; all of it is the local machine talking to itself.
+#
+# `.env` is the reason this file exists. A source upload carries the working directory, and a Next.js
+# process reads `.env` off its own filesystem at runtime - so a deployment built from an upload that
+# included it would settle against a real processor with credentials nobody configured it with. The
+# hosted floor is meant to run on the local one, and to say so; credentials belong in the platform's
+# own environment, where they can be named, rotated and removed.
+.env
+.env.*
+!.env.example
+
+# Local artefacts, none of which the build reads.
+shots/
+test-results/
+playwright-report/
+coverage/
+*.log
