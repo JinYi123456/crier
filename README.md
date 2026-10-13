@@ -114,7 +114,9 @@ PAYPAL_WEBHOOK_URL=https://your.host/api/webhooks/paypal
 In `sandbox` mode the app refuses to start a floor without both credentials, and neither is ever
 printed or committed. Under a live sandbox the buyer approves a real PayPal page, so a settlement
 stops on `funded` until they do — which is reported on the pile as `awaiting_approval`, alongside
-the rules the floor imposes itself.
+the rules the floor imposes itself. Pressing that card again asks the processor what the order's
+state is now, so the money completes from the approval alone; the webhook is a second door that
+pushes the same news, not the only one the floor can hear.
 
 Register the webhook in the PayPal dashboard against `PAYPAL_WEBHOOK_URL`. Every event is verified
 against the processor's signature before a word of it reaches a settlement; an event that does not
