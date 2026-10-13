@@ -1,9 +1,10 @@
 /**
  * Look at the room with real eyes.
  *
- * Opens a floor, rings the bell until there is something to see, and photographs the landing and the
- * pit at three widths while collecting every console complaint and any horizontal overflow. Output
- * lands in `shots/`, which is not committed; it is for the person building the screens.
+ * Opens a floor, rings the bell until there is something to see, and photographs the landing, the pit,
+ * the pile with a card read out, and the audit room at three widths while collecting every console
+ * complaint and any horizontal overflow. Output lands in `shots/`, which is not committed; it is for
+ * the person building the screens - and for the gallery a listing needs.
  *
  *   npx tsx tools/shots.ts [base-url]
  */
@@ -97,6 +98,23 @@ async function main(): Promise<number> {
     await page.locator('button.tape-in').nth(6).click().catch(() => undefined);
     await page.waitForTimeout(300);
     await shot(page, 'pit-inspector');
+
+    // The pile with one card read out loud. This is the screen where a model is doing a job on the
+    // floor, so it is photographed with the attribution line in frame, and it is allowed to be slow:
+    // a small model on a CPU takes half a minute over a paragraph.
+    await page.goto(`${base}/floor/${floor}`, { waitUntil: 'networkidle' });
+    const crier = page.getByRole('button', { name: 'have the crier read this chit' }).first();
+    if ((await crier.count()) === 1) {
+      await crier.click();
+      const read = await page.getByText(/^written by/).first().waitFor({ timeout: 150_000 }).catch(() => null);
+      if (read === null) problems.push('crier: no reading came back inside 150 seconds');
+      else {
+        await page.waitForTimeout(400);
+        await shot(page, 'pit-crier');
+      }
+    } else {
+      problems.push('crier: nothing was waiting on the pile to read');
+    }
 
     // The audit room: the grid has to actually paint rows, not just mount.
     await page.goto(`${base}/audit?floor=${floor}`, { waitUntil: 'networkidle' });
