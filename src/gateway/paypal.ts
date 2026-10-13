@@ -172,10 +172,7 @@ export class PayPalGateway implements PaymentGateway {
 
   constructor(options: PayPalOptions) {
     if (!options.clientId || !options.clientSecret) {
-      throw new GatewayError(
-        'sandbox mode needs PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET - without them the floor runs on the local sim',
-        500,
-      );
+      throw new GatewayError('the real processor needs PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET before this machine may speak for it', 422);
     }
     this.clientId = options.clientId;
     this.secret = options.clientSecret;
@@ -569,9 +566,10 @@ function parseJson<T>(text: string): T | null {
 }
 
 /**
- * Pick a gateway from the environment. The rule is that nothing here can fail an app boot: a
- * missing pair of credentials is not an error, it is the documented default, and the floor runs on
- * the local processor exactly as well.
+ * Pick a gateway from the environment. Saying nothing is the documented default: with no `GATEWAY`
+ * set, the floor runs on the local processor and needs no credentials at all. Naming the real
+ * processor without naming its credentials is not a default but a request nobody authorised, so this
+ * says so out loud rather than quietly trading a money intention for a simulation of one.
  */
 export function gatewayFromEnvironment(env: Readonly<Record<string, string | undefined>> = process.env): PaymentGateway {
   const mode = (env.GATEWAY ?? 'sim').trim().toLowerCase();

@@ -134,7 +134,7 @@ export default function OpenFloorForm({ instruments }: { instruments: readonly I
         <label className="flex items-center gap-2 text-[13px] text-white/70">
           <input type="checkbox" checked={sandbox} onChange={(event) => setSandbox(event.target.checked)} className="h-4 w-4 accent-brass" />
           settle on the real processor
-          <span className="text-white/35">(needs credentials; otherwise the local one plays the part)</span>
+          <span className="text-white/35">(only a machine that has been handed PayPal credentials is allowed to)</span>
         </label>
 
         <button

@@ -55,6 +55,23 @@ describe('the floor as a service', () => {
     await expect(openFloor({ seed: 'ab' })).rejects.toBeInstanceOf(FloorError);
   });
 
+  it('will not pretend to move money through a processor it has no standing with', async () => {
+    // The hosted floor gets this question from a checkbox on the front door. The honest answer is that
+    // this machine was never handed the credentials - not a crash, and not a simulation passed off as
+    // the thing somebody asked for.
+    const refusal = await openFloor(
+      { seed: 'no-credentials-here', gateway: 'sandbox', maxTicks: 6 },
+      { PAYPAL_CLIENT_ID: '', PAYPAL_CLIENT_SECRET: '' },
+    ).catch((error: unknown) => error);
+    expect(refusal).toBeInstanceOf(FloorError);
+    expect((refusal as FloorError).status).toBe(422);
+    expect((refusal as FloorError).message).toMatch(/PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET/);
+
+    // The same floor on the local processor needs nothing and opens at once.
+    const local = await openFloor({ seed: 'no-credentials-here', maxTicks: 6 });
+    expect(local.session.snapshot().gateway).toBe('sim');
+  });
+
   it('rings the bell and leaves a tape that verifies', async () => {
     const { id } = await floor('bell-round', { instruments: ['coffee-green'] });
     const result = await stepFloor(id);

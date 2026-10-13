@@ -67,9 +67,19 @@ function store(): Store {
 
 function gatewayFor(mode: 'sim' | 'sandbox', env: Readonly<Record<string, string | undefined>>): PaymentGateway | undefined {
   if (mode === 'sim') return undefined;
+  const clientId = env.PAYPAL_CLIENT_ID ?? '';
+  const clientSecret = env.PAYPAL_CLIENT_SECRET ?? '';
+  if (clientId.length === 0 || clientSecret.length === 0) {
+    // Not a crash and not a substitution: this machine was asked to move money through a processor it
+    // has no standing with. The answer says which half is missing, and the floor stays shut.
+    throw new FloorError(
+      'this machine has no PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET, so it cannot settle on the real processor - open the floor on the local one instead',
+      422,
+    );
+  }
   return new PayPalGateway({
-    clientId: env.PAYPAL_CLIENT_ID ?? '',
-    clientSecret: env.PAYPAL_CLIENT_SECRET ?? '',
+    clientId,
+    clientSecret,
     apiBase: env.PAYPAL_API_BASE,
     webhookId: env.PAYPAL_WEBHOOK_ID,
     publicUrl: env.PUBLIC_APP_URL ?? env.PAYPAL_WEBHOOK_URL,
