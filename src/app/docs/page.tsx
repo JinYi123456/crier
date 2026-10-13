@@ -7,6 +7,7 @@ import {
   STRAY_PRICE_BPS,
 } from '../../core/settlement';
 import { cash } from '../ui/format';
+import { spokenBy } from '../../server/interpreter';
 
 export const dynamic = 'force-dynamic';
 
@@ -102,7 +103,23 @@ const RULES: readonly { readonly label: string; readonly line: string; readonly 
   },
 ];
 
-export default function DocsPage(): React.ReactElement {
+const VOICES = [
+  {
+    head: 'A hosted model',
+    body: 'AI_BASE_URL, AI_API_KEY and AI_MODEL point the room at any OpenAI-compatible chat endpoint. All three or none: a base and a key without a named model would answer with a default the screen cannot name.',
+  },
+  {
+    head: 'A model on this machine',
+    body: 'With no endpoint configured the floor asks a local Ollama server what it holds and takes the smallest completion-capable model installed. A laptop with `ollama serve` running is a talking floor with nothing pasted into it.',
+  },
+  {
+    head: 'The desk template',
+    body: 'Deterministic prose built from the same facts, in the same words the card already shows. This is what a fresh clone, the test suite and any public demo speak — and a chit never goes blank because a model was unreachable.',
+  },
+];
+
+export default async function DocsPage(): Promise<React.ReactElement> {
+  const voice = await spokenBy();
   return (
     <div className="mx-auto max-w-[980px] pt-10">
       <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-brass">how it works</p>
@@ -153,6 +170,29 @@ export default function DocsPage(): React.ReactElement {
       </ul>
 
       <div className="mt-12 flex items-center gap-3">
+        <span className="font-display text-[19px] text-brass">The interpreter</span>
+        <span className="h-px flex-1 bg-brass/25" />
+      </div>
+      <p className="mt-3 max-w-[720px] text-[13.5px] leading-relaxed text-white/60">
+        The engine speaks in minor units and rule ids; a person on the pile reads sentences. When a settlement stops, the chit can be read out
+        in plain English by the floor's interpreter — a language model when one answers on this machine, and a fixed template when none does.
+        The card says which of the two wrote it, because somebody is about to sign a decision off those words.
+      </p>
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+        {VOICES.map((voice) => (
+          <article key={voice.head} className="brass-edge rounded-lg bg-felt/45 p-4">
+            <h2 className="font-display text-[15px] text-paper">{voice.head}</h2>
+            <p className="mt-2 text-[12.5px] leading-relaxed text-white/55">{voice.body}</p>
+          </article>
+        ))}
+      </div>
+      <p className="mt-3 max-w-[720px] text-[13px] leading-relaxed text-white/45">
+        <span className="text-brass">This machine is read by:</span> <span className="font-mono text-white/70">{voice.spokenBy}</span>. What no
+        channel gets to do is touch a number: the model is handed the amounts the engine already decided and asked to talk about them, it sets
+        no price and approves nothing, and its prose is never sealed into the tape. A brief that contradicts the card loses.
+      </p>
+
+      <div className="mt-12 flex items-center gap-3">
         <span className="font-display text-[19px] text-brass">Check it without trusting us</span>
         <span className="h-px flex-1 bg-brass/25" />
       </div>
@@ -193,6 +233,10 @@ export default function DocsPage(): React.ReactElement {
         <li className="flex flex-wrap gap-x-3">
           <span className="w-[190px] shrink-0 text-buy">GET /api/floor/&#123;id&#125;/tape</span>
           <span className="text-white/55">the whole recording as a file, in the format the auditor reads — pointer in the query included, so a tape can be taken from any machine</span>
+        </li>
+        <li className="flex flex-wrap gap-x-3">
+          <span className="w-[190px] shrink-0 text-buy">GET /api/floor/&#123;id&#125;/chit</span>
+          <span className="text-white/55">one held settlement read out loud — <span className="text-white/70">?trade=&lt;id&gt;</span> and a pointer, and the answer names the channel that wrote it</span>
         </li>
         <li className="flex flex-wrap gap-x-3">
           <span className="w-[190px] shrink-0 text-sell">POST /api/webhooks/paypal</span>

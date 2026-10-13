@@ -46,6 +46,17 @@ concentration. Anything they catch goes on the human pile with the reason writte
 stays there until somebody signs a release or a veto. The signature on that decision is the
 operator's own key, not the platform's.
 
+A person who is about to sign for other people's money should not have to read rule codes and minor
+units, so each chit can be read out loud by the floor's interpreter. It is a language model when one
+answers — a hosted endpoint, or the smallest chat model installed on a local Ollama server — and a
+fixed deterministic template when none does, and the card always says which of the two wrote it. What
+the model never gets is a number to decide: it is handed the amounts the engine already fixed and
+asked to talk about them, it approves nothing, and its prose is not sealed into the tape. Every reading
+is then checked against the card it claims to read — the amount has to be quoted, the payer has to come
+before the payee, and a figure the record does not hold is a reason to throw the paragraph away — so a
+model that drifts costs the reader a plainer sentence rather than a wrong one. The record stays
+arithmetic; only the reading of it is generated.
+
 ## The screens
 
 | Route | What is on it |
@@ -128,10 +139,10 @@ src/core/       the engine. No filesystem, no network unless a live price feed i
   settlement.ts match to money: escrow, capture, fee, payout, refund, and the veto layer
 
 src/gateway/    the payment boundary. types.ts is the contract; sim.ts and paypal.ts are the two bodies.
-src/server/     rooms, and the mapping from a refusal to an HTTP status.
+src/server/     rooms, the interpreter that reads a chit to a person, and the mapping from a refusal to an HTTP status.
 src/app/        Next.js App Router: the screens and the JSON API.
 tools/          the terminal pit, the ledger auditor, the language audit, the screenshot walk.
-tests/          vitest, 157 tests over the engine and the gateway.
+tests/          vitest, 180 tests over the engine, the gateway and the interpreter.
 ```
 
 The engine is server-side only — it uses `node:crypto` and never runs in the browser. Client

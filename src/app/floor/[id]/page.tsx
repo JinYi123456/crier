@@ -1,5 +1,6 @@
 import { INSTRUMENTS } from '../../../core/catalog';
 import { FloorError, floorSnapshot, pointerOf, readPointer, roomForId, roundOf } from '../../../server/floor';
+import { spokenBy } from '../../../server/interpreter';
 import Pit from '../../ui/Pit';
 
 export const dynamic = 'force-dynamic';
@@ -38,7 +39,8 @@ export default async function FloorPage({
   try {
     const { room: held, rebuilt } = await roomForId(room, readPointer(query), roundOf(query));
     const initial = floorSnapshot(room);
-    return <Pit id={room} initial={initial} instruments={instruments} pointer={pointerOf(held)} rebuilt={rebuilt} />;
+    const voice = await spokenBy();
+    return <Pit id={room} initial={initial} instruments={instruments} pointer={pointerOf(held)} rebuilt={rebuilt} crier={voice.spokenBy} />;
   } catch (error) {
     if (!(error instanceof FloorError)) throw error;
     return (

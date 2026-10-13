@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SessionSnapshot, SerializedTrade } from '../../core/world';
 import type { Finding, SealedMessage } from '../../core/protocol';
 import type { FloorPointer, TickResult } from '../../server/floor';
-import type { TradeActionKind } from './ChitStack';
+import type { ChitVoice, TradeActionKind } from './ChitStack';
 import ChitStack from './ChitStack';
 import DepthBoard from './DepthBoard';
 import SeatRing, { type Seat } from './SeatRing';
@@ -31,12 +31,15 @@ export default function Pit({
   instruments,
   pointer,
   rebuilt,
+  crier,
 }: {
   id: string;
   initial: Envelope;
   instruments: readonly InstrumentCard[];
   pointer?: FloorPointer;
   rebuilt?: boolean;
+  /** Who writes a brief for a chit, on the machine that served this page. */
+  crier?: string;
 }): React.ReactElement {
   const [snapshot, setSnapshot] = useState<SessionSnapshot>(initial.snapshot);
   const [messages, setMessages] = useState<readonly SealedMessage[]>(initial.snapshot.messages);
@@ -162,8 +165,25 @@ export default function Pit({
     [id, pointerFields],
   );
 
-  const handOverKey = useCallback((): void => {
-    const given = keyDraft.trim();
+  /**
+   * Have the floor's interpreter read one chit.
+   *
+   * A held settlement arrives as rule codes and integers. This asks for the sentence a person can
+   * decide on and carries the pointer, so whichever machine answers has the room the card came from.
+   */
+  const askCrier = useCallback(
+    async (tradeId: string): Promise<ChitVoice | string> => {
+      const asked = search({ trade: tradeId });
+      const where = `/api/floor/${encodeURIComponent(id)}/chit?${asked ?? new URLSearchParams({ trade: tradeId }).toString()}`;
+      const response = await fetch(where, { cache: 'no-store' });
+      const body = (await response.json()) as Partial<ChitVoice> & { error?: string };
+      if (typeof body.text !== 'string' || body.text.length === 0) return body.error ?? 'the crier would not answer';
+      return { text: body.text, spokenBy: typeof body.spokenBy === 'string' ? body.spokenBy : '', source: body.source ?? 'template' };
+    },
+    [id, search],
+  );
+
+  const handOverKey = useCallback((): void => {    const given = keyDraft.trim();
     if (given.length === 0) return;
     operatorKeyRef.current = given;
     rememberOperatorKey(given);
@@ -411,7 +431,7 @@ export default function Pit({
         </div>
 
         <div className="space-y-4">
-          <ChitStack trades={held} currency={currency} policy={snapshot.policy} onAction={decide} busy={busy} />
+          <ChitStack trades={held} currency={currency} policy={snapshot.policy} onAction={decide} onRead={askCrier} crier={crier ?? 'the desk template'} busy={busy} />
           <TradeRail trades={trades} currency={currency} onAction={decide} busy={busy} />
         </div>
       </div>
