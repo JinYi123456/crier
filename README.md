@@ -124,10 +124,27 @@ the rules the floor imposes itself. Pressing that card again asks the processor 
 state is now, so the money completes from the approval alone; the webhook is a second door that
 pushes the same news, not the only one the floor can hear.
 
-Register the webhook in the PayPal dashboard against `PAYPAL_WEBHOOK_URL`. Every event is verified
-against the processor's signature before a word of it reaches a settlement; an event that does not
-verify is refused, and a verified event that belongs to no trade here is acknowledged anyway — the
-processor retries anything it does not hear back from.
+To drive it end to end yourself:
+
+1. On the PayPal developer site, open **Apps & Credentials**, make a sandbox app, and copy its client
+   id and secret. The same page lists a sandbox **buyer** and **seller** — keep the buyer's email and
+   password, because that is the identity that approves a checkout page.
+2. Put the pair in `.env` as above, `npm run dev`, and tick **settle on the real processor** on the
+   front door. A machine that has not been handed credentials is refused, out loud.
+3. Ring the bell. Each crossed book mints a real order and the chit grows a link to PayPal's own
+   approval page; open it, sign in as that buyer, approve.
+4. Press the chit. The floor reads the order's state off the processor, captures it, books the fee and
+   pays the seller. Nothing here needs a webhook registered.
+
+The sign-in in step 3 is why a hosted demo cannot show the real leg: past the approval page is an
+account that belongs to whoever is looking, not to the floor. Everything up to that page — order
+creation, the approval link on the chit, the capture, the refund, the payout — is the code this
+repository ships, and `/docs` walks the same four steps.
+
+Register the webhook in the PayPal dashboard against `PAYPAL_WEBHOOK_URL` if you want pushed events
+believed rather than refused. Every event is verified against the processor's signature before a word
+of it reaches a settlement; an event that does not verify is refused, and a verified event that belongs
+to no trade here is acknowledged anyway — the processor retries anything it does not hear back from.
 
 ## How it is put together
 

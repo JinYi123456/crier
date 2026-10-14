@@ -260,9 +260,62 @@ export default async function DocsPage(): Promise<React.ReactElement> {
         </li>
       </ul>
 
-      <p className="mt-10 max-w-[720px] text-[13px] leading-relaxed text-white/40">
-        Talking to the real processor needs credentials in the environment - a client id and secret, and a webhook id if you want events
-        believed rather than refused. Without them the floor runs on the local processor and every screen, rule and posting behaves the same.
+      <div className="mt-12 flex items-center gap-3">
+        <span className="font-display text-[19px] text-brass">Take the real leg apart yourself</span>
+        <span className="h-px flex-1 bg-brass/25" />
+      </div>
+      <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="space-y-3 text-[13.5px] leading-relaxed text-white/60">
+          <p>
+            This address runs on the local processor, and it says so when asked: a public floor must not be
+            opening orders under anybody&apos;s account. The real PayPal API is one environment variable away
+            from the identical screens, and the sandbox it talks to is free.
+          </p>
+          <ol className="ml-4 list-decimal space-y-2 marker:font-mono marker:text-brass/70">
+            <li>
+              On the PayPal developer site, open <span className="text-white/80">Apps &amp; Credentials</span> and create a
+              sandbox app. The client id and secret are on its own page.
+            </li>
+            <li>
+              Note the sandbox <span className="text-white/80">buyer</span> email next to it. This is the step no hosted floor can do
+              for you: past the approval page is a sign-in, and the sign-in belongs to the sandbox, not to this app.
+            </li>
+            <li>
+              Put the pair in your own environment and start the floor. Nothing else changes - the same screens, the same rules,
+              the same tape.
+            </li>
+            <li>
+              Tick <span className="text-white/80">settle on the real processor</span> on the front door, open a floor, ring the bell.
+              Each crossed book mints a real order; a held chit grows a link that opens PayPal&apos;s own approval page.
+            </li>
+            <li>
+              Approve it as that buyer, then come back and press the chit. The floor asks the processor what the order&apos;s state is
+              now, captures it, books the fee and pays the seller - no webhook needed for any of that.
+            </li>
+          </ol>
+        </div>
+        <div className="self-start rounded-lg bg-black/45 p-4 font-mono text-[12px] leading-relaxed text-white/70">
+          <div className="text-white/40"># the whole of what the real leg needs</div>
+          <div>GATEWAY=sandbox</div>
+          <div>PAYPAL_CLIENT_ID=...</div>
+          <div>PAYPAL_CLIENT_SECRET=...</div>
+          <div className="mt-3 text-white/40"># then</div>
+          <div>npm install &amp;&amp; npm run dev</div>
+          <div className="mt-3 text-white/40"># optional: only if you want pushed events believed</div>
+          <div>PAYPAL_WEBHOOK_ID=...</div>
+          <div>PAYPAL_WEBHOOK_URL=https://your.host/api/webhooks/paypal</div>
+          <div className="mt-3 text-white/40">
+            # with no id set, every pushed event is refused at the door -
+          </div>
+          <div className="text-white/40"># and the money still moves, because the floor asks</div>
+        </div>
+      </div>
+
+      <p className="mt-6 max-w-[720px] text-[13px] leading-relaxed text-white/40">
+        Worth knowing which half is whose. The approval page, the order number and the capture receipt are PayPal&apos;s; a settlement
+        stopping on the pile is ours, and so is refusing to let the platform complete one alone. With no credentials at all the floor
+        runs on a local processor that emits the same event names, which is why every screen, rule and posting here is the same code a
+        sandbox would be driving.
       </p>
 
       <div className="mt-8 flex flex-wrap gap-5 font-mono text-[12.5px]">
