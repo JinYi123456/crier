@@ -57,6 +57,7 @@ export default function ChitStack({
   onAction,
   onRead,
   crier,
+  crierSource,
   busy,
 }: {
   trades: readonly SerializedTrade[];
@@ -66,6 +67,8 @@ export default function ChitStack({
   onRead: (tradeId: string) => Promise<ChitVoice | string>;
   /** Who writes a brief on this machine, worked out before anybody asks for one. */
   crier: string;
+  /** Whether that is a model or the template, so a card can say why it fell back rather than guess. */
+  crierSource: string;
   busy: boolean;
 }): React.ReactElement {
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -178,7 +181,9 @@ export default function ChitStack({
                       <p className="text-[12.5px] leading-snug text-[#26201a]">{brief.text}</p>
                       <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.1em] text-[#8a7a5c]">
                         {brief.source === 'template'
-                          ? 'written by the desk template - no model answers on this machine, and the numbers above are the record either way'
+                          ? crierSource === 'template'
+                            ? 'written by the desk template - no model answers on this machine, and the numbers above are the record either way'
+                            : `written by the desk template - ${crier} was asked about this card and either did not answer or contradicted the record, so its reading was thrown away`
                           : `written by ${brief.spokenBy} - it talks about the figures on this card and moves none of them`}
                       </p>
                     </div>

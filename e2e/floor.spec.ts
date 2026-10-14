@@ -96,6 +96,15 @@ test('a settlement a rule caught is read aloud, refused by a person, and the tap
   // Whoever wrote the paragraph, it has to be about this card: the figure stamped on the chit is in it.
   await expect(card.locator('p').first()).toContainText(stamped.replace(/[^0-9.]/g, ''));
 
+  // The pile names its channel before anybody presses anything and the card names the one that wrote
+  // the reading, in the same breath, in front of a person about to sign. They may not disagree: a
+  // machine that has a model on it cannot say no model answers here because one card fell back.
+  const header = (((await page.getByText(/^the crier here is/i).first().textContent()) ?? '')).toLowerCase();
+  const attribution = (((await card.getByText(/^written by/).first().textContent()) ?? '')).toLowerCase();
+  if (attribution.includes('no model answers on this machine')) {
+    expect(header).toContain('the desk template');
+  }
+
   await card.getByPlaceholder('say why, if you refuse it').fill('not between these two, not at this price');
   await card.getByRole('button', { name: 'refuse it' }).click();
   await expect(page.locator('li.paper')).toHaveCount(onThePile - 1, { timeout: 30_000 });

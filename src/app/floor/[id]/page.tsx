@@ -40,7 +40,7 @@ export default async function FloorPage({
     const { room: held, rebuilt } = await roomForId(room, readPointer(query), roundOf(query));
     const initial = floorSnapshot(room);
     const voice = await spokenBy();
-    return <Pit id={room} initial={initial} instruments={instruments} pointer={pointerOf(held)} rebuilt={rebuilt} crier={voice.spokenBy} />;
+    return <Pit id={room} initial={initial} instruments={instruments} pointer={pointerOf(held)} rebuilt={rebuilt} crier={voice.spokenBy} crierSource={voice.source} />;
   } catch (error) {
     if (!(error instanceof FloorError)) throw error;
     return (

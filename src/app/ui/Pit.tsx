@@ -32,6 +32,7 @@ export default function Pit({
   pointer,
   rebuilt,
   crier,
+  crierSource,
 }: {
   id: string;
   initial: Envelope;
@@ -40,6 +41,8 @@ export default function Pit({
   rebuilt?: boolean;
   /** Who writes a brief for a chit, on the machine that served this page. */
   crier?: string;
+  /** Whether that is a model or the template. */
+  crierSource?: string;
 }): React.ReactElement {
   const [snapshot, setSnapshot] = useState<SessionSnapshot>(initial.snapshot);
   const [messages, setMessages] = useState<readonly SealedMessage[]>(initial.snapshot.messages);
@@ -431,7 +434,7 @@ export default function Pit({
         </div>
 
         <div className="space-y-4">
-          <ChitStack trades={held} currency={currency} policy={snapshot.policy} onAction={decide} onRead={askCrier} crier={crier ?? 'the desk template'} busy={busy} />
+          <ChitStack trades={held} currency={currency} policy={snapshot.policy} onAction={decide} onRead={askCrier} crier={crier ?? 'the desk template'} crierSource={crierSource ?? 'template'} busy={busy} />
           <TradeRail trades={trades} currency={currency} onAction={decide} busy={busy} />
         </div>
       </div>

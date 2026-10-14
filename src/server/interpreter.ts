@@ -56,11 +56,13 @@ let cached: ChatChannel | null | undefined;
 const DEFAULT_OLLAMA_BASE = 'http://127.0.0.1:11434';
 /**
  * A chit is a few sentences, and a small model on a laptop without a GPU writes them at roughly the
- * speed of a person reading them out - a full brief measured 37s on a 4B model kept in CPU RAM. The
- * wait is bounded twice over: a completion budget, and a timeout generous enough to cover a cold model
- * load on top of that, after which the template speaks rather than the card sitting blank.
+ * speed of a person reading them out - a full brief on a 4B model kept in CPU RAM measured 68s on this
+ * machine, and a cold load is inside that number rather than outside it. The wait is bounded twice
+ * over: a completion budget, and a timeout with room for the slowest honest reading, after which the
+ * template speaks rather than the card sitting blank. A timeout below the measured latency would not
+ * be a bound at all; it would just be a switch that turns the model off.
  */
-const CHAT_TIMEOUT_MS = 60_000;
+const CHAT_TIMEOUT_MS = 150_000;
 const MAX_COMPLETION_TOKENS = 260;
 const PROBE_TIMEOUT_MS = 1_200;
 /** Families worth loading ahead of the rest when nobody named a model. */
