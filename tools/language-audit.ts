@@ -24,9 +24,10 @@ const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.js', '.mjs', '.cjs',
  *
  * They are read from a file beside this one which is deliberately not tracked, because a list of the
  * phrases that must not be in a repository cannot itself be in that repository - and because spelling
- * them out in source defeats the patterns meant to catch them: `/\bhackathon\b/` never matches the
- * literal text of its own definition, since the `b` of the escape and the `h` of the word are both word
- * characters, so there is no boundary to find. Absent the file, the language rule still holds.
+ * them out in source defeats the patterns meant to catch them: a boundary escape followed by the word
+ * never matches the literal text of its own definition, since the letter of the escape and the first
+ * letter of the word are both word characters, so there is no boundary for the engine to find. Absent
+ * the file, the language rule still holds.
  */
 const PHRASE_FILE = join(ROOT, 'tools', 'phrase-blocklist.json');
 
