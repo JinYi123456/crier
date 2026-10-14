@@ -55,6 +55,18 @@ describe('the floor as a service', () => {
     await expect(openFloor({ seed: 'ab' })).rejects.toBeInstanceOf(FloorError);
   });
 
+  it('refuses a board that mixes currencies, in words rather than in a stack', async () => {
+    // One pit in the catalogue is priced in euros and every door opens a dollar board. Asking for both
+    // used to reach the engine and come back as a 500, which is a crash wearing the clothes of an
+    // answer: the visitor did nothing wrong but want something the floor cannot settle.
+    const refusal = await openFloor({ seed: 'whole-catalogue', instruments: ['coffee-green', 'olive-oil'], maxTicks: 6 }).catch(
+      (error: unknown) => error,
+    );
+    expect(refusal).toBeInstanceOf(FloorError);
+    expect((refusal as FloorError).status).toBe(422);
+    expect((refusal as FloorError).message).toContain('olive-oil');
+  });
+
   it('will not pretend to move money through a processor it has no standing with', async () => {
     // The hosted floor gets this question from a checkbox on the front door. The honest answer is that
     // this machine was never handed the credentials - not a crash, and not a simulation passed off as

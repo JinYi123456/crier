@@ -219,6 +219,10 @@ export default async function DocsPage(): Promise<React.ReactElement> {
       </div>
       <ul className="mt-3 space-y-1.5 font-mono text-[12px]">
         <li className="flex flex-wrap gap-x-3">
+          <span className="w-[190px] shrink-0 text-buy">GET /api/floor</span>
+          <span className="text-white/55">the rooms open on this machine, and the instrument board a door may pick from</span>
+        </li>
+        <li className="flex flex-wrap gap-x-3">
           <span className="w-[190px] shrink-0 text-buy">POST /api/floor</span>
           <span className="text-white/55">open a floor from a seed, or take the one that seed already opened</span>
         </li>

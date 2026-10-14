@@ -1,4 +1,5 @@
 import { INSTRUMENTS } from '../core/catalog';
+import { DEFAULT_CURRENCY, DEFAULT_INSTRUMENTS } from '../core/world';
 import { listFloors } from '../server/floor';
 import { floorHref } from './ui/pointer';
 import FrontDoor from './ui/FrontDoor';
@@ -18,11 +19,14 @@ export default function Home(): React.ReactElement {
   return (
     <div className="pt-10">
       <FrontDoor
+        currency={DEFAULT_CURRENCY}
+        defaults={DEFAULT_INSTRUMENTS}
         instruments={INSTRUMENTS.map((instrument) => ({
           id: instrument.id,
           name: instrument.name,
           symbol: instrument.symbol,
           lot: instrument.lot,
+          currency: instrument.currency,
         }))}
       />
 
@@ -63,7 +67,7 @@ export default function Home(): React.ReactElement {
         />
         <Column
           kicker="A log that confesses"
-          body="Every message is signed by the house that spoke it and quotes the seal of the one before it. Edit a line three hundred messages back and every seal after it stops verifying - the audit screen will show you exactly which sentence broke, and there is a button here that does it on purpose."
+          body="Every message is signed by the house that spoke it and quotes the seal of the one before it. Edit a line three hundred messages back and every seal after it stops verifying - the audit screen will show you exactly which sentence broke, and there is a button in the pit that does it on purpose."
         />
         <Column
           kicker="A queue with a person in it"

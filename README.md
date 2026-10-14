@@ -17,7 +17,10 @@ npm run dev
 ```
 
 Then open <http://localhost:3000> and press **Take the floor**. No credentials, no accounts, no
-database — the whole thing runs on a seed and a deterministic local processor.
+database — the whole thing runs on a seed and a deterministic local processor. Node 22 or newer.
+
+The same build is running at <https://crier-ten.vercel.app> on a machine that was handed no credentials
+at all, which is why it settles on the local processor and says so on every card.
 
 ---
 
@@ -39,7 +42,10 @@ the book, a fill is printed, and the fill becomes a settlement:
 | `funded` | an order is opened and the buyer's money is held | escrow debit, buyer-claim credit |
 | `captured` | the processor takes the money, the fee is recognised | claim debited, seller payable and fee revenue credited |
 | `paid_out` | the seller is paid, the fee swept | payable debited, escrow credited |
+| `voided` | a person refused the settlement, so the order behind it is voided | the buyer's hold is released; nothing is captured |
+| `declined` | the payer's own funding source said no when the order was approved | the same release, booked as a void |
 | `refunded` | the claim is rebuilt and the cash handed back | the capture in reverse, plus any loss the platform absorbs |
+| `failed` | the processor refused an order or a payout | the trade stops wherever the money stands, with the reason on its line |
 
 Before capture, five rules read the ticket — size, stray price, standing, first pairing, session
 concentration. Anything they catch goes on the human pile with the reason written in words, and
@@ -61,7 +67,7 @@ arithmetic; only the reading of it is generated.
 
 | Route | What is on it |
 | --- | --- |
-| `/` | the door: pick a seed and instruments, or take the floor the default seed already opened |
+| `/` | the door: type a seed and pick a board, or take the default three pits with a seed nobody typed |
 | `/floor/{id}` | the pit — the seat ring, the crossed book, the human pile, the live tape |
 | `/audit?floor={id}` | the audit room — the journal in a grid, the trial balance, the chain verdict, and a scrubber that replays the session up to any line |
 | `/docs` | how it works, with every threshold read from the module that enforces it |
@@ -127,7 +133,7 @@ processor retries anything it does not hear back from.
 
 ```
 src/core/       the engine. No filesystem, no network unless a live price feed is configured.
-  rng.ts        seeded generator; the only source of "chance"
+  rng.ts        seeded generator; the engine's only source of "chance"
   money.ts      integer minor units, 36 currencies, no float arithmetic
   canonical.ts  canonical JSON: sorted keys, safe integers only
   keys.ts       Ed25519 identities derived from the seed
@@ -141,10 +147,12 @@ src/core/       the engine. No filesystem, no network unless a live price feed i
   settlement.ts match to money: escrow, capture, fee, payout, refund, and the veto layer
 
 src/gateway/    the payment boundary. types.ts is the contract; sim.ts and paypal.ts are the two bodies.
-src/server/     rooms, the interpreter that reads a chit to a person, and the mapping from a refusal to an HTTP status.
+src/server/     rooms, the interpreter that reads a chit to a person, the desk key that locks a public
+                floor's human actions, and the mapping from a refusal to an HTTP status.
 src/app/        Next.js App Router: the screens and the JSON API.
-tools/          the terminal pit, the ledger auditor, the language audit, the screenshot walk.
-tests/          vitest, 183 tests over the engine, the gateway and the interpreter.
+tools/          the terminal pit, the ledger auditor, the language audit, the sandbox smoke run, the
+                screenshot walk.
+tests/          vitest, 184 tests over the engine, the gateway, the interpreter and the HTTP layer.
 e2e/            Playwright, one shift at the desk: it rings the bell in a browser and clicks the pile.
 ```
 
@@ -160,8 +168,10 @@ npm run verify
 That is typecheck, the test suite, the language audit and a production build, in that order.
 
 `npm run test:e2e` is the Playwright pass over the live screens, and it needs a running app to point
-at: start `npm run dev` and it takes `http://127.0.0.1:3000`, or name another one with
-`E2E_BASE_URL=http://127.0.0.1:3222 npm run test:e2e`. It walks a floor the way a visitor does - rings
+at: start `npm run dev` and it takes `http://127.0.0.1:3000`. To point it at another one, set
+`E2E_BASE_URL` first — `$env:E2E_BASE_URL = 'http://127.0.0.1:3222'` in PowerShell, or
+`E2E_BASE_URL=http://127.0.0.1:3222 npm run test:e2e` in a POSIX shell — and the browsers come from
+`npx playwright install chromium`, once per machine. It walks a floor the way a visitor does - rings
 the bell until a settlement stops on the human pile, has the crier read that card, refuses it with a
 reason, and then asks the audit room whether the books still agree - and it reaches every one of those
 rooms through its pointer URL, so the machine painting the page may be one that never saw the floor
@@ -179,7 +189,8 @@ be skipped by forgetting it.
 ## What this is not
 
 - **Not durable.** Rooms live in the process that opened them, and a restart forgets which floors were
-  running. What it does not lose is the recording: every round is a pure function of the seed and the
+  running; so does a ninth floor, which retires whichever of the eight it holds has gone unwatched
+  longest. What it does not lose is the recording: every round is a pure function of the seed and the
   shape the id was hashed from, so a URL that carries that pointer — `?seed=…&instruments=…&ticks=…`
   — is answered by any machine, warmed or brand new, and the tape it paints is the same tape, line for
   line and seal for seal. A screen quotes the pointer on every request and keeps it in the address bar,

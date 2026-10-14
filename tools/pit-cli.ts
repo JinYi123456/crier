@@ -1,8 +1,6 @@
-import { writeFileSync } from 'node:fs';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { formatMoney, type CurrencyCode, type Money } from '../src/core/money.ts';
-import { renderMoney } from '../src/core/money.ts';
+import { formatMoney, renderMoney, type CurrencyCode, type Money } from '../src/core/money.ts';
 import { fingerprint } from '../src/core/canonical.ts';
 import { DEFAULT_INSTRUMENTS, Session } from '../src/core/world.ts';
 import { INSTRUMENTS } from '../src/core/catalog.ts';
@@ -142,8 +140,8 @@ function describeMessage(message: SealedMessage, currency: CurrencyCode): string
 
 function describeTrade(trade: TradeRecord, currency: CurrencyCode): string {
   const flags = trade.held ? ` HELD(${trade.vetoRules.join('+') || 'rule'})` : '';
-  const fee = trade.feeMinor > 0 ? ` fee ${trade.feeMinor}` : '';
-  const refunded = trade.refundedMinor > 0 ? ` refunded ${trade.refundedMinor}` : '';
+  const fee = trade.feeMinor > 0 ? ` fee ${renderMoney(money(trade.feeMinor, currency))}` : '';
+  const refunded = trade.refundedMinor > 0 ? ` refunded ${renderMoney(money(trade.refundedMinor, currency))}` : '';
   return `${trade.id.slice(0, 22).padEnd(24)} ${trade.phase.padEnd(9)} ${String(trade.buyer).padEnd(22)} ${String(trade.seller).padEnd(22)} ${renderMoney(money(trade.grossMinor, currency))}${fee}${refunded}${flags}`;
 }
 

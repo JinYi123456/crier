@@ -11,6 +11,7 @@
 
 # Local artefacts, none of which the build reads.
 shots/
+tools/phrase-blocklist.json
 test-results/
 playwright-report/
 coverage/

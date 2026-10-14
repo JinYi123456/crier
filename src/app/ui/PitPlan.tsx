@@ -55,7 +55,7 @@ export default function PitPlan({ agents, ticks, pits, seed, sandbox }: PitPlanP
   const buyers = seatsOn('buy', agents);
   const sellers = seatsOn('sell', agents);
   const board = { left: CX - 95, top: CY - 46, width: 190, height: 92, right: CX + 95 };
-  const heading = pits.length === 1 ? `${pits[0]?.symbol ?? ''} · clerk board` : `${String(pits.length)} pits · clerk board`;
+  const heading = pits.length === 1 ? `${pits[0]?.symbol ?? ''} · clerk board` : `${String(pits.length)} pits · a board each`;
 
   return (
     <figure className="m-0">
@@ -157,7 +157,7 @@ export default function PitPlan({ agents, ticks, pits, seed, sandbox }: PitPlanP
       <figcaption className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] text-white/40">
         <span className="text-buy">{`${String(agents)} houses`} a side</span>
         <span>·</span>
-        <span>{`${String(agents * 2)} seats around one board`}</span>
+        <span>{`${String(agents * 2)} seats`}</span>
         <span>·</span>
         <span className="text-paper/70">{pits.length === 1 ? pits[0]?.name : `${String(pits.length)} pits open`}</span>
         <span>·</span>

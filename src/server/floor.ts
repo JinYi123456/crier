@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { DEFAULT_INSTRUMENTS, Session, type SessionConfig } from '../core/world';
-import { instrumentById } from '../core/catalog';
+import { DEFAULT_CURRENCY, DEFAULT_INSTRUMENTS, Session, type SessionConfig } from '../core/world';
+import { INSTRUMENTS, instrumentById } from '../core/catalog';
 import type { CurrencyCode } from '../core/money';
 import { verifyChain, type Finding } from '../core/protocol';
 import { PayPalGateway } from '../gateway/paypal';
@@ -127,13 +127,20 @@ export async function openFloor(request: OpenFloorRequest, env: Readonly<Record<
   if (seed.length < 4) throw new FloorError('a floor needs a seed of at least four characters');
   const mode = request.gateway === 'sandbox' ? 'sandbox' : 'sim';
   const instruments = request.instruments && request.instruments.length > 0 ? request.instruments : DEFAULT_INSTRUMENTS;
+  const currency = request.currency ?? DEFAULT_CURRENCY;
+  // One board settles in one currency, and the catalogue carries a pit priced in euros. The engine
+  // throws on that from inside an opening, which reaches a visitor as a 500; asking here turns the
+  // same fact into a sentence the door can show.
+  const settled = new Map(INSTRUMENTS.map((entry) => [entry.id, entry.currency]));
+  const offBoard = instruments.filter((id) => (settled.get(id) ?? currency) !== currency);
+  if (offBoard.length > 0) throw new FloorError(`this board settles in ${currency}, and ${offBoard.join(', ')} does not`, 422);
   const config: SessionConfig = {
     seed,
     instrumentIds: instruments,
     payoutMode: request.payoutMode ?? 'immediate',
     agentsPerSide: request.agentsPerSide ?? 4,
     maxTicks: request.maxTicks ?? 12,
-    currency: request.currency ?? 'USD',
+    currency,
     ...(mode === 'sandbox' ? { gateway: gatewayFor(mode, env) } : {}),
   };
   const session = await Session.open(config);

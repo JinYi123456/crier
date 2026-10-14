@@ -23,9 +23,18 @@ export interface InstrumentOption {
   readonly name: string;
   readonly symbol: string;
   readonly lot: string;
+  readonly currency: string;
 }
 
-export default function FrontDoor({ instruments }: { instruments: readonly InstrumentOption[] }): React.ReactElement {
+export default function FrontDoor({
+  instruments,
+  defaults,
+  currency,
+}: {
+  readonly instruments: readonly InstrumentOption[];
+  readonly defaults: readonly string[];
+  readonly currency: string;
+}): React.ReactElement {
   const router = useRouter();
   const [seed, setSeed] = useState('');
   const [picked, setPicked] = useState<string[]>([]);
@@ -35,9 +44,12 @@ export default function FrontDoor({ instruments }: { instruments: readonly Instr
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  const pits = (picked.length > 0 ? instruments.filter((instrument) => picked.includes(instrument.id)) : instruments).map(
-    (instrument) => ({ name: instrument.name, symbol: instrument.symbol }),
-  );
+  // Nothing picked means the server opens its default board, so that is what the plan draws. A plan of
+  // some other floor is the one mistake this screen exists not to make.
+  const opening = picked.length > 0 ? picked : [...defaults];
+  const pits = instruments
+    .filter((instrument) => opening.includes(instrument.id))
+    .map((instrument) => ({ name: instrument.name, symbol: instrument.symbol }));
 
   function toggle(id: string): void {
     setPicked((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]));
@@ -108,19 +120,29 @@ export default function FrontDoor({ instruments }: { instruments: readonly Instr
             </label>
 
             <div>
-              <span className="text-[11px] uppercase tracking-[0.18em] text-white/45">Instruments - leave none picked for the full board</span>
+              <span className="text-[11px] uppercase tracking-[0.18em] text-white/45">Instruments - leave none picked to open the default board</span>
               <div className="mt-2 flex flex-wrap gap-2">
                 {instruments.map((instrument) => {
                   const on = picked.includes(instrument.id);
+                  const onBoard = instrument.currency === currency;
                   return (
                     <button
                       key={instrument.id}
                       type="button"
-                      title={instrument.lot}
+                      title={
+                        onBoard
+                          ? `${instrument.lot} · settles in ${instrument.currency}`
+                          : `${instrument.lot} - priced in ${instrument.currency}, and this board settles in ${currency}`
+                      }
+                      disabled={!onBoard}
                       onClick={() => toggle(instrument.id)}
                       aria-pressed={on}
                       className={`rounded-full border px-3 py-1 text-[12px] transition ${
-                        on ? 'border-brass bg-brass/20 text-brass' : 'border-white/15 text-white/60 hover:border-white/35 hover:text-white/80'
+                        !onBoard
+                          ? 'cursor-not-allowed border-white/10 text-white/25'
+                          : on
+                            ? 'border-brass bg-brass/20 text-brass'
+                            : 'border-white/15 text-white/60 hover:border-white/35 hover:text-white/80'
                       }`}
                     >
                       {instrument.name} <span className="font-mono opacity-70">{instrument.symbol}</span>

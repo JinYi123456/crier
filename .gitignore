@@ -20,6 +20,9 @@
 .env.*
 !.env.example
 
+# the phrases this tree must not contain, which is why the list of them is not in it either
+/tools/phrase-blocklist.json
+
 # editors and operating system noise
 .DS_Store
 *.log

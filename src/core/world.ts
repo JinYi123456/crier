@@ -68,6 +68,9 @@ const STRATEGIES: readonly StrategyKind[] = ['patient', 'urgent', 'anchor', 'vol
 
 export const DEFAULT_INSTRUMENTS = ['coffee-green', 'ceramic-mug', 'saffron'] as const;
 
+/** One board settles in one currency, and this is the one a floor opens with unless told otherwise. */
+export const DEFAULT_CURRENCY = 'USD' satisfies CurrencyCode;
+
 /**
  * The bell. A session is a recording, so its clock starts at a fixed, published time rather than
  * at `Date.now()` - that is what lets two people compare tapes.
@@ -262,7 +265,7 @@ export class Session {
     this.config = {
       ...config,
       seed,
-      currency: config.currency ?? 'USD',
+      currency: config.currency ?? DEFAULT_CURRENCY,
       agentsPerSide: config.agentsPerSide ?? 4,
       maxTicks: config.maxTicks ?? 12,
       startAt: config.startAt ?? DEFAULT_START_AT,
